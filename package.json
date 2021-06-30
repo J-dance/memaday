@@ -5,8 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "cd client && npm install && npm run build",
-    "start": "node server/index.js"
+    "build-client": "cd client && npm install && npm run build",
+    "build-server": "tsc",
+    "start": "nodemon server/index.ts",
+    "start-js": "concurrently \"tsc -w\" \"nodemon dist/index.js\""
   },
   "keywords": [],
   "engines": {
@@ -15,6 +17,18 @@
   "author": "jdance",
   "license": "ISC",
   "dependencies": {
+    "body-parser": "^1.19.0",
+    "cross-env": "^7.0.3",
+    "dotenv": "^10.0.0",
     "express": "^4.17.1"
+  },
+  "devDependencies": {
+    "@types/body-parser": "^1.19.0",
+    "@types/express": "^4.17.12",
+    "@types/node": "^15.12.5",
+    "concurrently": "^6.2.0",
+    "nodemon": "^2.0.9",
+    "ts-node": "^10.0.0",
+    "typescript": "^4.3.4"
   }
 }

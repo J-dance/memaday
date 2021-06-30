@@ -1,5 +1,5 @@
-const path = require('path');
-const express = require("express");
+import express, { Request, Response } from 'express'
+import path from 'path'
 
 const PORT = process.env.PORT || 3001;
 
@@ -9,12 +9,12 @@ const app = express();
 app.use(express.static(path.resolve(__dirname, '../client/build')));
 
 // api request endpoint
-app.get("/api", (req, res) => {
+app.get("/api", (req: Request, res: Response) => {
   res.json({ message: "Hello from server!" });
 });
 
 // All other GET requests not handled before will return our React app
-app.get('*', (req, res) => {
+app.get('*', (req: Request, res: Response) => {
   res.sendFile(path.resolve(__dirname, '../client/build', 'index.html'));
 });
 
