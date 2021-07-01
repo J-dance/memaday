@@ -1,0 +1,16 @@
+@import '../../../assets//styles';
+
+.form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  width: 80%;
+  height: 35%;
+  padding: 25px;
+
+  .field {
+    display: flex;
+    flex-direction: column;
+  }
+}

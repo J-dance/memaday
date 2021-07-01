@@ -1,0 +1,39 @@
+// Global styles in here
+@import url('https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,100;0,200;0,300;0,400;0,500;0,700;1,100;1,200;1,400;1,500&family=Roboto:ital,wght@0,300;0,400;0,700;1,400&display=swap');
+
+// Colours
+$colour-main: #5EC2CB;
+$colour-orange-light: #F2B509;
+$colour-orange-dark: #F08700;
+$colour-green: #78B857;
+$colour-white: #FCFCFC;
+$colour-black: #2A2B2E;
+$colour-grey: #F4F5F4;
+
+// Fonts
+$font-main: 'Raleway', sans-serif;
+$font-other: 'Roboto', sans-serif;
+
+.title {
+  font-family: $font-main;
+  color: $colour-orange-light;
+  letter-spacing: 0.2rem;
+  font-weight: 400;
+}
+
+.slogan {
+  font-family: $font-main;
+  font-style: italic;
+  color: $colour-black;
+  font-size: 1.2rem;
+}
+
+// Layout/Features
+
+// black square frame
+.frame {
+  border: 5px solid $colour-black;
+  aspect-ratio: 1/1;
+  border-radius: 5px;
+  box-shadow: 0px 0px 12px 12px $colour-white;
+}
