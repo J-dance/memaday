@@ -4,13 +4,68 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  width: 80%;
-  height: 35%;
-  padding: 25px;
+  width: 50%;
+  height: auto;
+
+  .formTitleContainer {
+    width: 100%;
+    margin: 0px;
+    padding: 0px;
+  }
 
   .field {
     display: flex;
     flex-direction: column;
+    width: 100%;
+    margin: 10px 0px;
+  }
+
+  .password {
+    color: rgba($colour-black, 0.7);
+    font-style: italic;
+    font-size: 0.7rem;
+    margin: 0px;
+    padding: 0px;
+  }
+}
+
+// Responsive Design
+
+// S
+@media screen and (max-width: $mob-width) {
+  .form {
+    width: 70%;
+
+    .slogan {
+      text-align: center;
+    }
+  }
+}
+
+// M
+@media screen and (min-width: $mob-width+1) and (max-width: $tablet-width) {
+  .form {
+    width: 70%;
+  }
+}
+
+// L
+@media screen and (min-width: $tablet-width) and (max-width: $desktop-width) {
+  .form {
+    width: 50%;
+  }
+}
+
+// XL
+@media screen and (min-width: $desktop-width) and (max-width: $hd-monitor-width) {
+  .form {
+    width: 50%;
+  }
+}
+
+// XXL
+@media screen and (min-width: $hd-monitor-width) {
+  .form {
+    width: 40%;
   }
 }

@@ -14,9 +14,13 @@ const LoginForm = () => {
 
   return (
     <form className={styles.form} onSubmit={handleSubmit(onSubmit)}>
+      <div className={styles.formTitleContainer}>
+        <p className={styles.textTitle}>Log in or sign up <span className={styles.link}>here</span></p>
+      </div>
       <div className={styles.field}>
-        <label>Username</label>
+        <label className={styles.labelText}>Username</label>
         <input
+          className={styles.inputBox}
           type="text"
           {...register("username", {
             // username validation
@@ -33,8 +37,10 @@ const LoginForm = () => {
       </div>
 
       <div className={styles.field}>
-        <label>Password</label>
+        <label className={`${styles.labelText}`}>Password</label>
+        <p className={styles.password}>Must contain a number and upper case letter</p>
         <input
+        className={styles.inputBox}
           type="password"
           {...register("password", {
             // password validation
@@ -58,7 +64,10 @@ const LoginForm = () => {
           <div className="error">{errors.password.message}</div>
         )}
       </div>
-      <button type="submit">Log in</button>
+      <button className={styles.button} type="submit">Log in</button>
+      <div className={styles.formTitleContainer}>
+        <p className={styles.slogan}>Get the joy of forgotten memories!</p>
+      </div>
     </form>
   )
 }
