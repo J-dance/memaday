@@ -18,7 +18,6 @@ const Login = () => {
       <div className={styles.rightSide}>
         <img src={logo} />
         <LoginForm />
-        <p className={styles.slogan}>Get the joy of forgotten memories!</p>
       </div>
     </section>
   )
