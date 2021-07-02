@@ -97,6 +97,14 @@ $font-other: 'Roboto', sans-serif;
   font-style: italic;
 }
 
+.errorText {
+  color: rgba($colour-orange-dark, 0.9);
+  font-style: italic;
+  font-size: 0.8rem;
+  margin: 0px;
+  padding: 0px;
+}
+
 // Responsive Break Points
 // max movbile width
 $mob-width: 420px;

@@ -9,6 +9,7 @@ const LoginForm = () => {
 
   // Form submission handler
   const onSubmit = (data: UserLogin) => {
+    alert("log in successful");
     console.log("data", data);
   };
 
@@ -32,7 +33,7 @@ const LoginForm = () => {
           placeholder="username"
         />
         {errors.username && (
-          <div>{errors.username.message}</div>
+          <div className={styles.errorText}>{errors.username.message}</div>
         )}
       </div>
 
@@ -61,7 +62,7 @@ const LoginForm = () => {
           placeholder="password"
         />
         {errors.password && (
-          <div className="error">{errors.password.message}</div>
+          <div className={styles.errorText}>{errors.password.message}</div>
         )}
       </div>
       <button className={styles.button} type="submit">Log in</button>
