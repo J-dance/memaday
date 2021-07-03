@@ -58,6 +58,14 @@ $font-other: 'Roboto', sans-serif;
   box-shadow: 0px 0px 12px 12px $colour-white;
 }
 
+.banner {
+  background: rgba($colour-black, 0.5);
+  width: 100%;
+  padding: 25px 50px;
+  margin: 25px 0px;
+  height: auto;
+}
+
 // buttons
 .button {
   display: flex;
