@@ -122,3 +122,29 @@ $tablet-width: 769px;
 $desktop-width: 1024px;
 // large monitors e.g. Ipad Pro
 $hd-monitor-width: 1366px;
+
+// Responsive Design
+
+// // S
+// @media screen and (max-width: $mob-width) {
+ 
+// }
+
+// // M
+// @media screen and (min-width: $mob-width) and (max-width: $tablet-width) {
+
+// }
+
+// // L
+// @media screen and (min-width: $tablet-width) and (max-width: $desktop-width) {
+
+// }
+
+// // XL
+// @media screen and (min-width: $desktop-width) and (max-width: $hd-monitor-width) {
+
+// }
+// // XXL
+// @media screen and (min-width: $hd-monitor-width) {
+  
+// }

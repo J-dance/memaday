@@ -4,3 +4,48 @@
   padding: 0px;
   margin: 0px;
 }
+
+/* React Swiper navigation Edit */
+.swiper-button-next {
+  background-image: url('./assets/SVGs/arrow.svg');
+  background-repeat: no-repeat;
+  background-size: 70% auto;
+  background-position: center;
+}
+
+.swiper-button-next::after {
+  display: none;
+}
+
+.swiper-button-prev {
+  background-image: url('./assets/SVGs/arrow.svg');
+  background-repeat: no-repeat;
+  background-size: 70% auto;
+  background-position: center;
+  transform: scaleX(-1);
+}
+
+.swiper-button-prev::after {
+  display: none;
+}
+
+.swiper-pagination-bullet {
+  background-color: #2A2B2E !important;
+}
+.swiper-pagination-bullet-active {
+  background-color: #5EC2CB !important;
+  transform: scale(1.4);
+}
+
+/* Responsive design */
+@media screen and (max-width: 420px) {
+
+  /* Remove carousel arrows */
+  .swiper-button-prev {
+    display: none !important;
+  }
+
+  .swiper-button-next {
+    display: none !important;
+  }
+}
