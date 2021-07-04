@@ -38,7 +38,7 @@
 }
 
 /* Responsive design */
-@media screen and (max-width: 420px) {
+@media screen and (max-width: 769px) {
 
   /* Remove carousel arrows */
   .swiper-button-prev {
