@@ -7,11 +7,8 @@
 
   .loginButton {
     position: absolute;
-    top: 20px;
-    right: 20px;
     z-index: 20;
     margin: 0px !important;
-    padding: 10px 20px !important;
 
     a {
       color: $colour-white;
@@ -119,6 +116,14 @@
 
 // S
 @media screen and (max-width: $mob-width) {
+
+  .loginButton {
+    top: 4vw;
+    right: 4vw;
+    padding: 2vw 5vw !important;
+    font-size: 2.5vw;
+  }
+
   .titleContainer {
     height: 72vh;
     aspect-ratio: 1/1;
@@ -187,51 +192,56 @@
 
 // M
 @media screen and (min-width: $mob-width) and (max-width: $tablet-width) {
+
+  .loginButton {
+    top: 4vw;
+    right: 4vw;
+    padding: 2vw 5vw !important;
+    font-size: 2.5vw;
+  }
+
   .titleContainer {
-    height: 72vw;
+    height: 72vh;
     aspect-ratio: 1/1;
 
     .titleAntiContainer {
-      grid-template-columns: 0.8fr 1.2fr;
-      grid-template-rows: 1fr 2fr;
-      margin-left: 5vw;
-      width: 60%;
+      grid-template-rows: 0.75fr 1fr 2fr;
+      width: 100vw;
 
       .title {
-        font-size: 4rem;
+        font-size: 12vw;
         margin: 20px 0px;
       }
 
       .textContainer {
-        grid-column-start: 2;
-        grid-column-end: 3;
-        grid-row-start: 1;
-        grid-row-end: 2;
+        grid-row-start: 2;
+        grid-row-end: 3;
+      }
+
+      .title, .slogan {
+        text-align: center;
       }
 
       .logoImg {
-        grid-column-start: 1;
-        grid-column-end: 2;
         grid-row-start: 1;
         grid-row-end: 2;
-        width: 70%;
-        justify-self: end;
-        margin-right: 25px;
+        justify-self: center;
+        align-self: center;
+        width: 20%;
       }
 
       .carousel {
-        grid-column-start: 1;
-        grid-column-end: 3;
-        grid-row-start: 2;
-        grid-row-end: 3;
-        aspect-ratio: 2/1;
-        width: 100%;
+        grid-row-start: 3;
+        grid-row-end: 4;
+        aspect-ratio: 2/1.2;
+        width: 80%;
 
         .slide {
-          padding: 25px 40px;
+          padding: 15px 20px;
 
           h1 {
-            margin: 0px 30px;
+            justify-self: end;
+            margin: 0px 10px;
           }
         }
 
@@ -240,16 +250,16 @@
         }
 
         .shareSVG {
-          height: 50%;
+          height: 40%;
         }
 
         .speechBubble {
-          width: 65px;
-          margin: 0px 0px 30px 4px;
+          width: 45px;
+          margin: 0px 0px 20px 3px;
         }
 
         .flip {
-          margin: 35px 4px 0px 0px;
+          margin: 0px 3px 0px 0px;
         }
       }
     }
@@ -258,51 +268,56 @@
 
 // L
 @media screen and (min-width: $tablet-width) and (max-width: $desktop-width) {
+
+  .loginButton {
+    top: 4vw;
+    right: 4vw;
+    padding: 2vw 5vw !important;
+    font-size: 2.5vw;
+  }
+
   .titleContainer {
-    height: 72vw;
+    height: 72vh;
     aspect-ratio: 1/1;
 
     .titleAntiContainer {
-      grid-template-columns: 0.8fr 1.2fr;
-      grid-template-rows: 1fr 2fr;
-      margin-left: 4vw;
-      width: 60%;
+      grid-template-rows: 0.75fr 1fr 2fr;
+      width: 100vw;
 
       .title {
-        font-size: 4rem;
+        font-size: 12vw;
         margin: 20px 0px;
       }
 
       .textContainer {
-        grid-column-start: 2;
-        grid-column-end: 3;
-        grid-row-start: 1;
-        grid-row-end: 2;
+        grid-row-start: 2;
+        grid-row-end: 3;
+      }
+
+      .title, .slogan {
+        text-align: center;
       }
 
       .logoImg {
-        grid-column-start: 1;
-        grid-column-end: 2;
         grid-row-start: 1;
         grid-row-end: 2;
-        width: 70%;
-        justify-self: end;
-        margin-right: 25px;
+        justify-self: center;
+        align-self: center;
+        width: 20%;
       }
 
       .carousel {
-        grid-column-start: 1;
-        grid-column-end: 3;
-        grid-row-start: 2;
-        grid-row-end: 3;
+        grid-row-start: 3;
+        grid-row-end: 4;
         aspect-ratio: 2/1;
-        width: 100%;
+        width: 80%;
 
         .slide {
-          padding: 25px 40px;
+          padding: 15px 20px;
 
           h1 {
-            margin: 0px 30px;
+            justify-self: end;
+            margin: 0px 10px;
           }
         }
 
@@ -311,16 +326,16 @@
         }
 
         .shareSVG {
-          height: 50%;
+          height: 40%;
         }
 
         .speechBubble {
-          width: 65px;
-          margin: 0px 0px 30px 4px;
+          width: 45px;
+          margin: 0px 0px 20px 3px;
         }
 
         .flip {
-          margin: 35px 4px 0px 0px;
+          margin: 0px 3px 0px 0px;
         }
       }
     }
@@ -329,6 +344,14 @@
 
 // XL
 @media screen and (min-width: $desktop-width) and (max-width: $hd-monitor-width) {
+
+  .loginButton {
+    top: 4vw;
+    right: 4vw;
+    padding: 2vw 5vw !important;
+    font-size: 2.5vw;
+  }
+
   .titleContainer {
     height: 72vw;
     aspect-ratio: 1/1;
@@ -400,6 +423,14 @@
 
 // XXL
 @media screen and (min-width: $hd-monitor-width) {
+  
+  .loginButton {
+    top: 2vw;
+    right: 2vw;
+    padding: 0.8vw 2vw !important;
+    font-size: 1.4vw;
+  }
+
   .titleContainer {
     height: 72vw;
     aspect-ratio: 1/1;

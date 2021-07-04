@@ -76,6 +76,8 @@ $font-other: 'Roboto', sans-serif;
   border-radius: 5px;
   color: $colour-white;
   font-weight: 600;
+  font-family: $font-main;
+  letter-spacing: 0.08rem;
   padding: 7px 10px;
   margin: 25px auto;
   box-shadow: 2px 2px 2px 2px rgba($colour-black, 0.25);
@@ -119,7 +121,7 @@ $mob-width: 420px;
 // max landscape mobile and small tablets
 $tablet-width: 769px;
 // small desktop
-$desktop-width: 1024px;
+$desktop-width: 1025px;
 // large monitors e.g. Ipad Pro
 $hd-monitor-width: 1366px;
 
