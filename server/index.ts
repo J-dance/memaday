@@ -15,7 +15,7 @@ const app = express();
 
 // Allows requests from specified orgins only
 app.use(cors({
-  origin: ['http://localhost:3001', 'http://localhost:3002']
+  origin: ['http://localhost:3001', 'https://memaday.herokuapp.com/']
 }));
 
 // Get the body data as json from requests 

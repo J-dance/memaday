@@ -9,6 +9,7 @@ export const loginCheck = (data: UserLogin): LoginErrors => {
 
   // initiate empty error response for client
   const responseMessages: LoginErrors = {
+    status: 200,
     username: {
       value: false,
       message: ''
@@ -26,15 +27,18 @@ export const loginCheck = (data: UserLogin): LoginErrors => {
     if (result) {
       // password correct
       // set good error code
+      responseMessages.status = 200;
     }
     else {
       // incorrect password set bad error code
+      responseMessages.status = 401;
       responseMessages.password.value = true;
       responseMessages.password.message = 'Incorrect password';
     }
   }
   else {
     // incorrect username set bad error code
+    responseMessages.status = 404;
     responseMessages.username.value = true;
     responseMessages.username.message = 'Could not find the username entered';
   }

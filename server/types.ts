@@ -26,6 +26,7 @@ export interface ErrorMessage {
 
 // Log in api response error message data
 export interface LoginErrors {
+  status: number,
   username: ErrorMessage,
   password: ErrorMessage
 }

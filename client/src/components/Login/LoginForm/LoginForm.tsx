@@ -9,12 +9,14 @@ const LoginForm = () => {
 
   // Log in api response error message data
   interface ApiErrors {
+    status: number,
     username: ErrorMessage,
     password: ErrorMessage
   }
 
   // set state for api error message response
   const [errorResponse, setErrorResponse] = useState<ApiErrors>({
+    status: 200,
     username: {
       value: false,
       message: ''

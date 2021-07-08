@@ -14,7 +14,7 @@ router.use(function timeLog (req: Request, res: Response, next) {
 // log in routes below e.g. ../login/...
 router.post('/request', (req: Request, res: Response) => {
   const result: LoginErrors = loginCheck(req.body);
-  res.json(result);
+  res.status(result.status).json(result);
 })
 
 // export the router object
