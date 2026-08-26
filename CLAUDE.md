@@ -19,7 +19,8 @@ Read these before making architectural suggestions or writing code:
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — stack, system diagram, data model, deployment, repo layout
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — why each stack choice was made and what was rejected; don't re-propose a rejected alternative without new information
-- [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) — unresolved product questions; check here before assuming behavior for comment persistence, re-selectable photos, empty-pool handling, etc.
+- [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) — unresolved product questions; currently just empty-pool handling
+- [`docs/SCALING.md`](docs/SCALING.md) — what would change if usage grows past friend-group scale; not relevant to current build work
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — intended build order
 
 ## Stack (once implementation starts)

@@ -20,7 +20,9 @@ be settled first.
    `UNIQUE(group_id, local_date)` constraint, and the purge job that
    deletes the previous selection's blob + rows.
 6. **Today's-photo screen + comments** — the main daily view, comment
-   thread, view tracking ("who's seen today's photo").
+   thread, view tracking ("who's seen today's photo"), and an explicit
+   save/download action — saving the photo is encouraged, not something
+   the client tries to prevent.
 7. **Polish pass** — reactions, empty-pool handling, notifications-lite
    (in-app, no push yet since native isn't built).
 8. **Deploy** — API to Cloudflare Workers, web to Cloudflare Pages, both

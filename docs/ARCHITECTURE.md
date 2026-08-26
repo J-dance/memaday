@@ -16,6 +16,10 @@
 See [`DECISIONS.md`](DECISIONS.md) for the reasoning and alternatives considered
 for each of these.
 
+Target scale is friend groups, not the general public — see
+[`SCALING.md`](SCALING.md) for what would need to change if that ever
+grows, and roughly when. None of it needs to be built now.
+
 ## System diagram
 
 ```
@@ -49,7 +53,7 @@ photos(id, group_id, uploader_id, storage_key, width, height,
        blurhash, caption, state: pending|ready|shown|purged, created_at)
 
 daily_selections(id, group_id, photo_id, local_date, starts_at,
-                  expires_at, purge_after)                     -- UNIQUE(group_id, local_date)
+                  expires_at, purge_after)                     -- UNIQUE(group_id, local_date); purge_after = starts_at + 12h
 
 comments(id, selection_id, user_id, body, created_at)          -- FK cascade on selection delete
 
@@ -62,14 +66,18 @@ devices(user_id, expo_push_token, platform)                    -- added when nat
 
 Notes:
 - `comments` and `views` hang off the **daily selection**, not the photo
-  directly — this makes the "delete everything" cascade unambiguous, and
-  would let us keep a text-only "memory" of a past day later without a
-  schema change, if that's ever wanted (see [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md)).
+  directly — this makes the "delete everything" cascade unambiguous.
+  Comments are fully deleted with the photo, no memory is kept (see
+  [`DECISIONS.md`](DECISIONS.md)).
 - `UNIQUE(group_id, local_date)` on `daily_selections` makes the rotation
   job idempotent — a double cron fire is a no-op, not a duplicate photo.
 - Rotation is a **group-level** event on the group's own timezone +
   rotation hour, not a single global midnight — a group spread across
   timezones still sees the same photo at the same time.
+- `photos.state` only ever moves forward (`pending → ready → shown →
+  purged`) — a photo can be selected once, ever. No path back to `ready`.
+- The previous day's selection is hard-purged (blob + rows) 12 hours after
+  the new one starts, via the same hourly cron sweep.
 
 ## Repo layout
 

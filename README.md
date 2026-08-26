@@ -11,6 +11,7 @@ previous one — image and comments — is permanently deleted, everywhere.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — stack, system diagram, data model, deployment
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — key decisions made so far and why
 - [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) — unresolved product questions to settle before building
+- [`docs/SCALING.md`](docs/SCALING.md) — what would need to change if usage grows beyond friend groups (not needed now)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — planned build order once planning is done
 
 ## Core concept

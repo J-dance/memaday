@@ -114,6 +114,79 @@ cheap path — rejected.
 
 ---
 
+### Comments vaporize with the photo — no permanent memory
+
+**Decision:** Comments are hard-deleted along with their photo at purge
+time. No "memory" of past days is kept anywhere.
+
+**Why:** Matches the original brief ("deleted from everywhere") exactly.
+Confirmed — no change needed to the schema; `comments` already hangs off
+`daily_selections` and cascade-deletes with it.
+
+---
+
+### A photo can only be selected once — no replay
+
+**Decision:** Once a photo has been shown, it's gone for good.
+`photos.state` is a one-way door: `pending → ready → shown → purged`, never
+back to `ready`.
+
+**Why:** Confirmed by product owner. Simplifies the selection query (no
+need to track or reconsider previously-shown photos) and reinforces the
+one-shot, ephemeral feel of the app.
+
+**Implication:** this closes off "replay an old photo" as an option for the
+empty-pool case in [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) — the only real
+choices left there are skip-silently or nudge members to upload more.
+
+---
+
+### Saving/screenshotting the photo is encouraged, not discouraged
+
+**Decision:** No screenshot detection, warnings, or save-prevention on
+either platform. If anything, a save/download action should be made easy
+and obvious in the UI.
+
+**Why:** Confirmed by product owner — the ephemerality is about the shared
+*group experience and pool* resetting daily, not about preventing any
+individual from keeping a copy for themselves. This simplifies the client
+considerably (screenshot detection is unreliable and a poor experience
+anyway) and turns "save this" into a feature to design for rather than a
+threat to defend against.
+
+---
+
+### Purge delay: 12 hours after the next rotation
+
+**Decision:** When a new photo is selected, the previous day's selection
+(photo blob + row, comments, views, reactions) is hard-deleted 12 hours
+later, not immediately and not at end-of-day.
+
+**Why:** Confirmed by product owner. Long enough that no one's mid-comment
+gets yanked out from under them at the exact rotation moment; short enough
+that "deleted everywhere" still feels true within the same day. Replaces
+the draft ~1 hour placeholder in `ARCHITECTURE.md`.
+
+---
+
+### Scale target: friends, not the general public — for now
+
+**Decision:** Design for small friend-group usage (a handful to low dozens
+of groups, low tens of members each), not thousands of concurrent users.
+Free-tier limits (Neon, R2, Cloudflare Workers) are treated as comfortable
+headroom, not a near-term ceiling.
+
+**Why:** Confirmed by product owner — this is being built for friends
+first. Keeps the build simple: the hourly full-table-scan cron rotation
+approach and single-region Postgres are both fine at this scale, no need to
+build for scale that isn't needed yet.
+
+**But:** the architecture should still not paint us into a corner if usage
+grows. See [`SCALING.md`](SCALING.md) for what would actually need to
+change and roughly when — nothing there needs to be built now.
+
+---
+
 ### Rotation and deletion are cron-driven, not on-request
 
 **Decision:** An hourly Cloudflare Cron Trigger checks which groups are due
