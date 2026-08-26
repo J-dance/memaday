@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Worker name shows up in the Cloudflare dashboard and in the default
+  // *.workers.dev URL (memaday-api.<your-subdomain>.workers.dev).
+  "name": "memaday-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-01",
+  // Lets Workers-bundled code use a subset of Node.js built-ins — some
+  // dependencies expect these even if we never call Node APIs directly.
+  "compatibility_flags": ["nodejs_compat"],
+}

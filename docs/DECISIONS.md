@@ -236,6 +236,30 @@ understand than at-rest encryption.
 
 ---
 
+### Neon's HTTP driver, not a raw `pg` TCP connection
+
+**Decision:** `packages/db` connects to Postgres via
+`@neondatabase/serverless` (`drizzle-orm/neon-http`), which speaks to Neon
+over HTTP/fetch, not `pg`'s usual pooled TCP connection.
+
+**Why:** Cloudflare Workers can't hold a long-lived pooled TCP socket open
+the way a normal Node server can — each Worker invocation is short-lived
+and doesn't keep a persistent connection pool around between requests.
+Neon's HTTP driver is built for exactly this: every query is a stateless
+HTTP request, no connection pooling needed. This is forced by the
+Workers + Neon combination already chosen, not really a free choice.
+
+**Portability cost, named explicitly:** this ties `apps/api` to Neon's
+driver specifically — the schema and raw SQL stay portable to any Postgres
+host (per `docs/SCALING.md`), but *this file* would need to change to plain
+`pg` if we ever moved off Workers to a long-running host (Node/Bun/Fly),
+or to a different driver if we moved to a different edge-compatible
+Postgres provider. Documented inline in `packages/db/src/index.ts` as well,
+since it's exactly the kind of thing worth understanding when reading that
+file, not just this doc.
+
+---
+
 ### Rotation and deletion are cron-driven, not on-request
 
 **Decision:** An hourly Cloudflare Cron Trigger checks which groups are due

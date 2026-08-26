@@ -1,0 +1,11 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+allowBuilds:
+  # pnpm blocks postinstall scripts by default (a package could run
+  # arbitrary code on `pnpm install`) and asks per-package. These three
+  # are approved because they're required, well-known infra our stack
+  # already depends on directly, not transitive extras:
+  esbuild: true # bundler used internally by Wrangler and Drizzle Kit
+  sharp: true # native image processing, used by the Expo/Metro toolchain
+  workerd: true # Cloudflare's actual Workers runtime — what `wrangler dev` runs locally

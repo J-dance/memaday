@@ -110,8 +110,13 @@ memaday/
 └── turbo.json
 ```
 
-Nothing under `apps/` or `packages/` exists yet — this is the intended shape
-once implementation starts.
+This is the actual current structure, not just a plan — with one addition
+not shown above: `apps/mobile` also has its own `AGENTS.md`/`CLAUDE.md`
+(Expo's own template default, pointing at the exact SDK version's docs —
+left in place since it's genuinely useful). `packages/core` and the API
+are still empty/skeleton; `packages/db`'s schema and first migration are
+real. See [`docs/ROADMAP.md`](ROADMAP.md) for what's built vs. still
+ahead.
 
 ## Deployment
 

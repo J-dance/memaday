@@ -10,10 +10,14 @@ once a day a photo is randomly selected for the group to view and comment
 on; when the next one is selected, the previous photo and its comments are
 hard-deleted everywhere.
 
-**Current status: planning only. No application code exists yet.** Don't
-assume any file structure beyond what's actually in the repo — check before
-referencing paths like `apps/api` or `packages/core`, they may not exist
-yet.
+**Current status: monorepo scaffolded, no product features built yet.**
+`apps/api` is a Hono skeleton with only a `/v1/health` route. `apps/mobile`
+is Expo's default template, unmodified beyond package/script renames.
+`packages/db` has the full Drizzle schema and a first migration generated
+from it, but nothing has been migrated to a real database. `packages/core`
+is an empty placeholder. Still verify against the actual repo state before
+assuming specifics — this file is a summary, not a substitute for reading
+the code.
 
 Read these before making architectural suggestions or writing code:
 

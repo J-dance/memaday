@@ -1,13 +1,17 @@
 # Roadmap
 
-Planned build order once implementation starts. Nothing here has been built
-yet — see [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) for what should probably
-be settled first.
+Planned build order. Steps are checked off as they land — check the actual
+repo state before assuming a step is fully done, this list can drift.
 
-1. **Scaffold the monorepo** — pnpm workspaces, Turborepo, `packages/core`,
-   `packages/db` (Drizzle schema + first migration), `apps/api` (Hono
-   skeleton with health check), `apps/mobile` (Expo skeleton, web target
-   only).
+1. **✅ Scaffold the monorepo** — pnpm workspaces, Turborepo,
+   `packages/core` (empty placeholder), `packages/db` (Drizzle schema +
+   first migration generated, not yet run against a real database),
+   `apps/api` (Hono skeleton with `/v1/health`, deployable via
+   `wrangler dev`/`deploy`), `apps/mobile` (Expo's default template, web
+   target only). Everything typechecks and the one placeholder test
+   passes (`pnpm typecheck`, `pnpm test`). Uses Node 22 (pinned via
+   `.nvmrc` — Node 23 hit real Corepack/React Native tooling
+   incompatibilities during setup) and Wrangler v4.
 2. **Auth + identity keypair** — Better Auth wired up, email OTP to start.
    On signup, client generates the user's X25519 keypair, uploads the
    public key, stores the password-encrypted private key. This has to be

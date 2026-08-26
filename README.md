@@ -4,7 +4,10 @@ A group photo-sharing app: each group gets one randomly-selected photo per day.
 Members view it and comment. When the next day's photo is selected, the
 previous one — image and comments — is permanently deleted, everywhere.
 
-**Status:** planning — no application code has been written yet.
+**Status:** monorepo scaffolded (workspaces, empty `packages/core`, the
+Drizzle schema + first migration in `packages/db`, a health-check-only
+Hono API, and a default Expo skeleton). No product features built yet —
+see [`docs/ROADMAP.md`](docs/ROADMAP.md) for what's next.
 
 ## Start here
 
@@ -30,8 +33,16 @@ Privacy is a core feature, not an afterthought: photos and comments are
 the server only ever stores ciphertext it cannot read. See
 [`docs/ENCRYPTION.md`](docs/ENCRYPTION.md).
 
-## Repo layout (planned)
+## Repo layout
 
-This will become a monorepo once implementation starts — see
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#repo-layout) for the intended
-structure. Nothing has been scaffolded yet.
+pnpm workspaces + Turborepo monorepo — see
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#repo-layout) for the full
+structure and why it's set up this way. Requires Node 22 (see `.nvmrc`) and
+pnpm (via Corepack — run `corepack enable` if you don't have pnpm yet).
+
+```bash
+pnpm install
+pnpm dev         # runs every app's dev script in parallel via Turborepo
+pnpm typecheck   # tsc --noEmit across every package
+pnpm test        # vitest across every package
+```
