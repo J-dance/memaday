@@ -12,6 +12,7 @@ previous one — image and comments — is permanently deleted, everywhere.
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — key decisions made so far and why
 - [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) — unresolved product questions to settle before building
 - [`docs/SCALING.md`](docs/SCALING.md) — what would need to change if usage grows beyond friend groups (not needed now)
+- [`docs/ENCRYPTION.md`](docs/ENCRYPTION.md) — how the end-to-end encryption works, explained from first principles
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — planned build order once planning is done
 
 ## Core concept
@@ -23,6 +24,11 @@ previous one — image and comments — is permanently deleted, everywhere.
 4. Members **view and comment** on that photo through the day.
 5. At the next rotation, the old photo and its comments are **hard-deleted**
    (blob storage + database rows) before the new one appears.
+
+Privacy is a core feature, not an afterthought: photos and comments are
+**end-to-end encrypted** — encrypted on a member's device before upload, so
+the server only ever stores ciphertext it cannot read. See
+[`docs/ENCRYPTION.md`](docs/ENCRYPTION.md).
 
 ## Repo layout (planned)
 

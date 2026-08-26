@@ -12,6 +12,7 @@
 | Scheduler | Cloudflare Cron Trigger (hourly) | Drives the daily rotation + purge job; replaceable with any cron runner |
 | Client | Expo (React Native + Expo Router), web build only for now | One UI codebase; native iOS/Android added later via the same project, no rewrite |
 | Push (future) | Expo Push | Free wrapper over APNs/FCM, added when native ships |
+| Encryption | End-to-end via libsodium (client-side) | Server stores ciphertext only — can't read photos/comments even in principle. Full design in [`ENCRYPTION.md`](ENCRYPTION.md) |
 
 See [`DECISIONS.md`](DECISIONS.md) for the reasoning and alternatives considered
 for each of these.
@@ -33,29 +34,35 @@ Hono API (Cloudflare Workers) ──┬── Postgres (Neon)   users, groups, p
 Cron (hourly) → find groups due to rotate this hour → select photo → purge previous → notify
 ```
 
-**Upload path (3-legged, bytes never touch our server):**
-client asks API for a presigned R2 PUT URL → client uploads directly to R2 →
-client calls `POST /photos/confirm` to register the upload in Postgres.
-
-Client downsizes images (~2048px) and strips EXIF (GPS especially) before
-upload; server strips EXIF again as a backstop.
+**Upload path (3-legged, bytes never touch our server in any readable
+form):**
+client downsizes the image, strips EXIF, and **encrypts it with the
+group's key** → client asks API for a presigned R2 PUT URL → client
+uploads the ciphertext directly to R2 → client calls `POST /photos/confirm`
+(including the encryption nonce) to register it in Postgres. Full
+encryption design, including where keys come from and how they're shared
+between group members, is in [`ENCRYPTION.md`](ENCRYPTION.md) — read that
+before touching upload or group-membership code.
 
 ## Data model (draft — will change during implementation)
 
 ```
-users(id, email, display_name, avatar_key, created_at)
+users(id, email, display_name, avatar_key, created_at,
+      public_key, encrypted_private_key, kdf_salt)             -- see ENCRYPTION.md
 
 groups(id, name, timezone, rotation_hour, invite_code, created_by)
 
 group_members(group_id, user_id, role, joined_at)              -- composite PK
 
+group_keys(group_id, user_id, wrapped_key)                     -- see ENCRYPTION.md
+
 photos(id, group_id, uploader_id, storage_key, width, height,
-       blurhash, caption, state: pending|ready|shown|purged, created_at)
+       nonce, caption, state: pending|ready|shown|purged, created_at)
 
 daily_selections(id, group_id, photo_id, local_date, starts_at,
                   expires_at, purge_after)                     -- UNIQUE(group_id, local_date); purge_after = starts_at + 12h
 
-comments(id, selection_id, user_id, body, created_at)          -- FK cascade on selection delete
+comments(id, selection_id, user_id, body, created_at)          -- body is ciphertext; FK cascade on selection delete
 
 views(selection_id, user_id, viewed_at)                        -- "who has seen today's photo"
 
@@ -78,6 +85,13 @@ Notes:
   purged`) — a photo can be selected once, ever. No path back to `ready`.
 - The previous day's selection is hard-purged (blob + rows) 12 hours after
   the new one starts, via the same hourly cron sweep.
+- If a group has no eligible (unshown) photos at rotation time, no
+  selection is recorded for that date — members are nudged to upload
+  instead (see [`DECISIONS.md`](DECISIONS.md)).
+- No `blurhash` column — a blurhash would leak visual content to the
+  server, which the E2EE design doesn't allow. See
+  [`ENCRYPTION.md`](ENCRYPTION.md) for what this and the other columns
+  above mean and why.
 
 ## Repo layout
 

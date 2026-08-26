@@ -187,6 +187,55 @@ change and roughly when — nothing there needs to be built now.
 
 ---
 
+### Empty photo pool: nudge members to upload, don't skip silently or replay
+
+**Decision:** If a group has no unshown photos when its rotation is due,
+don't select anything that day — instead push a notification/in-app nudge
+asking members to upload. (Replaying an old photo isn't on the table per
+the "select once" decision above.)
+
+**Why:** Confirmed by product owner. Keeps the "one shot per photo" rule
+intact and turns an empty pool into a prompt that drives the core
+loop (uploading) rather than a silent gap the group might not notice.
+
+**Implication:** the rotation job needs a "no eligible photos" branch that
+records nothing in `daily_selections` for that date and instead triggers a
+notification — this is a `packages/core` concern, not just a UI concern for
+the empty state.
+
+---
+
+### Photo privacy: full end-to-end encryption (E2EE)
+
+**Decision:** Photos and comments are encrypted client-side with a
+per-group symmetric key before ever reaching the server. The server stores
+and moves ciphertext only — it cannot read photo or comment content, even
+in principle. Full design and reasoning in
+[`ENCRYPTION.md`](ENCRYPTION.md).
+
+**Why:** Confirmed by product owner as a key feature, not a nice-to-have.
+Three tiers were on the table: (0) access control only via a private
+bucket + auth-gated URLs, (1) encryption at rest with a server-held key
+(protects against a storage-layer breach, not against the server itself),
+(2) full E2EE (protects even against us). Chose (2).
+
+**Cost accepted knowingly:** no server-side image processing or EXIF
+backstop (client-only now), no blurhash placeholders, no readable comment
+text in push notification previews, no server-side content moderation ever.
+New member join requires an existing member's client to be online at some
+point to complete a key handoff — not instant the way adding a row to
+`group_members` alone would be. All detailed in `ENCRYPTION.md`.
+
+**Alternative considered:** Tier 1 (server-held key) was the pragmatic
+default recommendation — meaningfully simpler, no client-side key
+management, still protects against the most likely real failure (a leaked
+storage credential or misconfigured bucket). Rejected in favor of Tier 2
+because privacy was named as a key feature, and this project is explicitly
+also a learning vehicle — E2EE is a substantially richer thing to build and
+understand than at-rest encryption.
+
+---
+
 ### Rotation and deletion are cron-driven, not on-request
 
 **Decision:** An hourly Cloudflare Cron Trigger checks which groups are due
