@@ -312,3 +312,41 @@ manager dependency), and a "forgot password" reset genuinely loses access to
 the old encrypted private key — no recovery. This is the same trade-off
 `ENCRYPTION.md` already documents as low-stakes given the 12-hour purge
 window; it just now also gates login, not only key recovery.
+
+---
+
+### Staging environment set up now, on a `staging` branch, before deploy CI exists
+
+**Decision:** A full staging environment (Neon branch, separate Worker,
+separate R2 bucket, separate `BETTER_AUTH_SECRET`) is provisioned as part
+of the initial deploy setup, not added after prod is live. Deploys are
+gated by branch: pushes to `staging` deploy to staging, and only merging
+`staging` into `main` deploys to prod. Full layout in
+[`ARCHITECTURE.md#environments`](ARCHITECTURE.md#environments).
+
+**Why:** Two things pushed toward doing this early rather than
+retrofitting it. First, migrations are risky to rehearse for the first
+time against real data — `packages/db`'s schema already changes
+non-trivially (Better Auth's tables were just added), and every future
+schema change needs somewhere to run first that isn't prod. Second, the
+E2EE design (`ENCRYPTION.md`) means prod data can't be inspected to debug
+issues — you can't "just look at" a ciphertext photo or comment — so a
+throwaway staging environment with data you generated yourself is the only
+practical way to poke at real request/response flows while building.
+
+**Alternatives considered:**
+- *Single environment, add staging later* — less setup now, but every
+  migration between now and "later" would have gone straight to prod with
+  no rehearsal, and "later" tends to arrive after the first bad migration,
+  not before it.
+- *Neon: separate project instead of a branch* — more isolated (its own
+  compute/storage limits), but two projects means running every migration
+  twice by hand with no shared lineage between them. A branch is
+  copy-on-write off `main` and resettable in seconds, which fits
+  "throwaway test data" better, and this project's scale doesn't need the
+  extra isolation a second project would buy.
+- *Deploy to both environments on every push to `main`* — simplest CI, and
+  still on the table if the two-branch flow ends up feeling like
+  unnecessary process for a project this size. Rejected for now in favor
+  of `staging` acting as a real pre-prod gate, since the whole point is
+  catching a bad migration or rotation-logic edge case before it's live.

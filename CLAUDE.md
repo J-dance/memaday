@@ -10,14 +10,18 @@ once a day a photo is randomly selected for the group to view and comment
 on; when the next one is selected, the previous photo and its comments are
 hard-deleted everywhere.
 
-**Current status: monorepo scaffolded, no product features built yet.**
-`apps/api` is a Hono skeleton with only a `/v1/health` route. `apps/mobile`
-is Expo's default template, unmodified beyond package/script renames.
-`packages/db` has the full Drizzle schema and a first migration generated
-from it, but nothing has been migrated to a real database. `packages/core`
-is an empty placeholder. Still verify against the actual repo state before
-assuming specifics — this file is a summary, not a substitute for reading
-the code.
+**Current status: email+password auth + the E2EE identity keypair work
+end-to-end; no other product features yet.** `apps/api` is a Hono skeleton
+with `/v1/health` plus Better Auth mounted at `/v1/auth` (CORS +
+`trustedOrigins` scoped to `WEB_ORIGIN` — see
+[`docs/DECISIONS.md`](docs/DECISIONS.md)). `apps/mobile` still has Expo's
+default template screens behind the gate, but sign-up/sign-in/unlock now
+work (`src/components/auth-gate.tsx`), calling
+`packages/core/src/identity.ts` for the X25519 keypair + Argon2id
+password-locking (docs/ENCRYPTION.md). `packages/db`'s schema (including
+Better Auth's own tables) is migrated to a real Neon database. Still
+verify against the actual repo state before assuming specifics — this file
+is a summary, not a substitute for reading the code.
 
 Read these before making architectural suggestions or writing code:
 

@@ -9,12 +9,17 @@ import { createDb } from "@memaday/db";
 export function createAuth(env: {
   DATABASE_URL: string;
   BETTER_AUTH_SECRET: string;
+  WEB_ORIGIN: string;
 }) {
   const db = createDb(env.DATABASE_URL);
 
   return betterAuth({
     database: drizzleAdapter(db, { provider: "pg" }),
     secret: env.BETTER_AUTH_SECRET,
+    // Better Auth's own CSRF check on state-changing requests (separate
+    // from the CORS middleware in index.ts, which is what lets the
+    // browser's fetch through in the first place).
+    trustedOrigins: [env.WEB_ORIGIN],
     // Mounted under /v1 like every other route — see docs/ARCHITECTURE.md
     // on why the API is versioned from the first route.
     basePath: "/v1/auth",

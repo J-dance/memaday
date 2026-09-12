@@ -29,10 +29,13 @@ this app) is: encrypt the actual data with a fast symmetric key, then use
 asymmetric crypto only to deliver that symmetric key to the right people.
 This is often called "hybrid encryption."
 
-**Library:** [libsodium](https://doc.libsodium.org/) via `libsodium-wrappers`
-on web. It's the standard "don't roll your own crypto" choice — audited,
-widely used, and its docs are unusually readable if you want to go deeper
-on any primitive named below.
+**Library:** [libsodium](https://doc.libsodium.org/) via
+`libsodium-wrappers-sumo` on web — the "sumo" build, not plain
+`libsodium-wrappers`, because the latter strips out Argon2id
+(`crypto_pwhash`) to save bundle size, and the identity-keypair derivation
+below needs it. It's the standard "don't roll your own crypto" choice —
+audited, widely used, and its docs are unusually readable if you want to go
+deeper on any primitive named below.
 
 ## The three layers of keys in this app
 
@@ -56,6 +59,17 @@ key but never the password-derived key that unlocks it, so it can never
 decrypt it either. This is the same pattern password managers like
 Bitwarden use for "zero-knowledge" vaults, and it's what gives us
 multi-device support for free — no separate device-linking flow needed.
+
+**Implementation:** `generateIdentityKeypair`/`unlockIdentityKeypair` in
+[`packages/core/src/identity.ts`](../packages/core/src/identity.ts).
+Argon2id runs at libsodium's `INTERACTIVE` limits (~ms-scale, not the
+heavier `MODERATE`/`SENSITIVE` tiers meant for offline vaults) since it
+runs on the UI thread on every login, including on phones — the same tier
+1Password/Bitwarden use for their own "unlock with password" step. The
+locked private key is stored as a single `encrypted_private_key` column
+with no separate nonce column, so the AEAD nonce travels bundled with the
+ciphertext (`nonce || ciphertext`, both base64-encoded together) rather
+than in its own field.
 
 **Trade-off to know:** if a password reset happens without the old
 password (a "forgot password" flow), the old encrypted private key becomes

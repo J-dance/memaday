@@ -8,4 +8,13 @@
   // Lets Workers-bundled code use a subset of Node.js built-ins — some
   // dependencies expect these even if we never call Node APIs directly.
   "compatibility_flags": ["nodejs_compat"],
+  // Non-secret config, safe to commit. WEB_ORIGIN is the one browser
+  // origin allowed to make credentialed (cookie) requests to /v1/auth —
+  // see the CORS setup in src/index.ts. Expo's web dev server defaults to
+  // localhost:8081. Once staging/prod Workers exist (docs/ROADMAP.md step
+  // 8), each gets its own `env.<name>.vars.WEB_ORIGIN` pointing at that
+  // environment's deployed Pages URL instead of localhost.
+  "vars": {
+    "WEB_ORIGIN": "http://localhost:8081",
+  },
 }

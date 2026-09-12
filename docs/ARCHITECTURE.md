@@ -118,20 +118,63 @@ are still empty/skeleton; `packages/db`'s schema and first migration are
 real. See [`docs/ROADMAP.md`](ROADMAP.md) for what's built vs. still
 ahead.
 
+## Environments
+
+There are two environments, staging and prod, each with its own copy of
+every stateful piece — nothing is shared between them:
+
+| Service | Prod | Staging |
+|---|---|---|
+| Postgres | Neon **`main`** branch | Neon **`staging`** branch (same project) |
+| API | Worker `memaday-api` | Worker `memaday-api-staging` — a `wrangler.jsonc` `env.staging` block, same code, separate name/secrets/bindings |
+| Photo blobs | R2 bucket `memaday-photos` | R2 bucket `memaday-photos-staging` |
+| Web | Cloudflare Pages prod | Pages preview deploy (automatic per-branch, no separate project needed) |
+| `BETTER_AUTH_SECRET` | prod value | distinct value — session tokens must not verify across environments |
+
+**Why a Neon branch, not a second project:** Neon branches are
+copy-on-write off the parent — a `staging` branch can be reset back to
+`main`'s schema (or blown away and recreated) in seconds, which is exactly
+the "throwaway test data" behavior you want for a database you're about to
+run migrations against experimentally. A second project would be more
+isolated (fully separate compute/storage limits) but that isolation isn't
+needed at this project's scale, and two projects means running every
+migration twice by hand instead of once per branch under one project.
+
+**Migrations run once, against whichever branch you're pointed at** — same
+`drizzle-kit` command, different `DATABASE_URL`. There's no separate
+"staging migration" tooling; the branch a command touches is entirely a
+function of the connection string in `.env` or CI's environment secrets.
+
 ## Deployment
 
-API and web app deploy **independently**, even though they share a repo:
+Two long-lived branches drive deploys, deliberately adopted alongside this
+environment split rather than deploying straight from every push to
+`main`:
 
-- **API**: push to `main` → GitHub Actions runs `wrangler deploy` (path-filtered
-  to `apps/api/**`, `packages/core/**`, `packages/db/**`) → live on Cloudflare
-  Workers in ~seconds. Rollback is redeploying the previous Worker version.
-- **Web**: push to `main` → GitHub Actions runs `expo export -p web`
-  (path-filtered to `apps/mobile/**`, `packages/core/**`) → static output
-  deployed to Cloudflare Pages.
-- **Native** (later): manual `eas build` + store submission. Not tied to
-  every commit — App Store/Play Store review adds days of lag, so the API
-  is versioned (`/v1`, `/v2`) to stay backward-compatible with whatever
-  binary version is still installed on users' phones.
+- **`staging`** — every push deploys to the staging Worker + staging
+  Postgres branch + staging R2 bucket. This is where a schema change or a
+  new rotation-cron edge case gets exercised against real (throwaway) data
+  before it's anywhere near prod.
+- **`main`** — only updated by merging `staging` in once it's been
+  poked at. Every push here deploys to prod. `main` is otherwise
+  protected — no direct pushes.
+
+API and web app deploy **independently** within each environment, even
+though they share a repo:
+
+- **API**: push to `staging`/`main` → GitHub Actions runs `wrangler deploy
+  --env staging` or `wrangler deploy` (path-filtered to `apps/api/**`,
+  `packages/core/**`, `packages/db/**`) → live on the corresponding Worker
+  in ~seconds. Rollback is redeploying the previous Worker version.
+- **Web**: push to `staging`/`main` → GitHub Actions runs `expo export -p
+  web` (path-filtered to `apps/mobile/**`, `packages/core/**`) → static
+  output deployed to the corresponding Cloudflare Pages target.
+- **Native** (later): manual `eas build` + store submission, pointed at
+  whichever environment's API is being tested (TestFlight builds against
+  staging, release builds against prod). Not tied to every commit — App
+  Store/Play Store review adds days of lag, so the API is versioned
+  (`/v1`, `/v2`) to stay backward-compatible with whatever binary version
+  is still installed on users' phones.
 
 ## Portability discipline
 

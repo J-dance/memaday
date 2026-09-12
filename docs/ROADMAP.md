@@ -12,12 +12,19 @@ repo state before assuming a step is fully done, this list can drift.
    passes (`pnpm typecheck`, `pnpm test`). Uses Node 22 (pinned via
    `.nvmrc` — Node 23 hit real Corepack/React Native tooling
    incompatibilities during setup) and Wrangler v4.
-2. **Auth + identity keypair** — Better Auth wired up with email + password
-   login (see [`DECISIONS.md`](DECISIONS.md#email--password-auth-not-email-otp)
-   for why not OTP). On signup, client generates the user's X25519 keypair,
-   uploads the public key, stores the password-encrypted private key. This
-   has to be built alongside auth, not bolted on later — see
-   [`ENCRYPTION.md`](ENCRYPTION.md).
+2. **✅ Auth + identity keypair** — Better Auth wired up with email +
+   password login (see
+   [`DECISIONS.md`](DECISIONS.md#email--password-auth-not-email-otp) for
+   why not OTP). On signup, the client generates the user's X25519 keypair
+   (`generateIdentityKeypair` in
+   [`packages/core/src/identity.ts`](../packages/core/src/identity.ts)) and
+   uploads the public key plus the password-encrypted private key in the
+   same request. `apps/mobile` has minimal but functional sign-up/sign-in
+   screens wired to it (`AuthGate` in `src/components/auth-gate.tsx`),
+   including the "session cookie survived a reload but the in-memory key
+   didn't" unlock-only path — see [`ENCRYPTION.md`](ENCRYPTION.md).
+   Verified end-to-end against a real Neon database and `wrangler dev`, not
+   just typechecked.
 3. **Groups + key exchange** — create group (generates + wraps the group
    key for the creator), join by invite code, and the "existing member
    wraps the key for a new member" handoff flow. The trickiest non-crypto
@@ -37,8 +44,10 @@ repo state before assuming a step is fully done, this list can drift.
    encouraged, not something the client tries to prevent.
 7. **Polish pass** — reactions, member-removal key rotation, notifications-
    lite (in-app, no push yet since native isn't built).
-8. **Deploy** — API to Cloudflare Workers, web to Cloudflare Pages, both
-   wired to CI on push to `main`.
+8. **Deploy** — staging + prod environments (Neon branch, Worker, R2
+   bucket, secrets — one full set per environment, see
+   [`ARCHITECTURE.md`](ARCHITECTURE.md#environments)), wired to CI: push to
+   `staging` deploys staging, merging `staging` into `main` deploys prod.
 9. **(Later, once web is validated) Native** — swap `libsodium-wrappers`
    (WASM, doesn't run under Hermes) for a native-bindings crypto library,
    `eas build`, TestFlight, push notifications via Expo Push, App Store /
