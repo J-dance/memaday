@@ -12,10 +12,11 @@ repo state before assuming a step is fully done, this list can drift.
    passes (`pnpm typecheck`, `pnpm test`). Uses Node 22 (pinned via
    `.nvmrc` — Node 23 hit real Corepack/React Native tooling
    incompatibilities during setup) and Wrangler v4.
-2. **Auth + identity keypair** — Better Auth wired up, email OTP to start.
-   On signup, client generates the user's X25519 keypair, uploads the
-   public key, stores the password-encrypted private key. This has to be
-   built alongside auth, not bolted on later — see
+2. **Auth + identity keypair** — Better Auth wired up with email + password
+   login (see [`DECISIONS.md`](DECISIONS.md#email--password-auth-not-email-otp)
+   for why not OTP). On signup, client generates the user's X25519 keypair,
+   uploads the public key, stores the password-encrypted private key. This
+   has to be built alongside auth, not bolted on later — see
    [`ENCRYPTION.md`](ENCRYPTION.md).
 3. **Groups + key exchange** — create group (generates + wraps the group
    key for the creator), join by invite code, and the "existing member

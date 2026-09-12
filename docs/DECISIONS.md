@@ -275,3 +275,40 @@ should be triggered lazily on someone's next request.
 **Scale note:** an hourly sweep over all groups is fine up to roughly tens
 of thousands of groups. If the app ever grows past that, this moves to a
 queue-based fanout instead of a full-table scan — not a concern for launch.
+
+---
+
+### Email + password auth, not email OTP
+
+**Decision:** Better Auth is configured for email + password login, not the
+passwordless email-OTP flow originally sketched in `ROADMAP.md`.
+
+**Why:** [`ENCRYPTION.md`](ENCRYPTION.md)'s identity-keypair design encrypts
+each user's private key client-side with an Argon2id key derived from **the
+user's password**, so the server can store `encrypted_private_key` without
+ever being able to read it. Email OTP is passwordless — there'd be nothing
+for that derivation to use. Reconciling this required one of the login
+credential and the key-derivation secret to be the same thing (password
+auth), or introducing a second secret purely for key derivation, or dropping
+password-derived encryption and keeping the private key device-local only.
+
+**Alternatives considered:**
+- *OTP login + separate "encryption passphrase"* — keeps passwordless login,
+  but adds a second secret the user has to set and remember that behaves
+  exactly like a password in every way that matters (no recovery if
+  forgotten), for no real security benefit over just using one password.
+  Strictly more UI and more user burden than password auth, with the same
+  trade-offs.
+- *OTP login + device-only private key (never uploaded, even encrypted)* —
+  breaks the multi-device property `ENCRYPTION.md` relies on (log in
+  anywhere with the password, re-derive the key, done). Every new device
+  would need the same re-wrap-and-invite handoff as a brand-new member
+  joining a group, which is the heaviest flow in the whole crypto design —
+  a bad trade for what should be the common case of "open the web app on a
+  new browser."
+
+**Trade-off accepted:** normal password UX friction (reset flows, password
+manager dependency), and a "forgot password" reset genuinely loses access to
+the old encrypted private key — no recovery. This is the same trade-off
+`ENCRYPTION.md` already documents as low-stakes given the 12-hour purge
+window; it just now also gates login, not only key recovery.

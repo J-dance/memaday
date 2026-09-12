@@ -9,3 +9,8 @@ allowBuilds:
   esbuild: true # bundler used internally by Wrangler and Drizzle Kit
   sharp: true # native image processing, used by the Expo/Metro toolchain
   workerd: true # Cloudflare's actual Workers runtime — what `wrangler dev` runs locally
+  # Rejected (false, not omitted, so pnpm won't re-prompt): optional
+  # peer support in @better-auth/cli for ORMs/DBs this repo doesn't use
+  # (Prisma, SQLite). Their native build scripts have nothing to build for.
+  '@prisma/client': false
+  better-sqlite3: false

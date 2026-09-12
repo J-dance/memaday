@@ -2,13 +2,20 @@
 // docs/ARCHITECTURE.md and docs/ENCRYPTION.md. Keep those docs and this
 // file in sync when either changes.
 //
-// NOTE on `users`: this table is a draft. Wiring up Better Auth
-// (docs/ROADMAP.md step 2) will likely require reconciling these columns
-// with whatever shape its Drizzle adapter expects for its own
-// user/session/account tables — expect this file to change then.
+// `users`, `sessions`, `accounts`, `verifications` are Better Auth's own
+// tables (email+password auth — see docs/DECISIONS.md for why not OTP).
+// Their shape started from `npx better-auth generate` against
+// apps/api/src/auth.ts, then was hand-adjusted to fit this repo's
+// conventions: uuid ids (defaultRandom(), like every other table here,
+// instead of Better Auth's default string ids — see `generateId: false`
+// in auth.ts) and `withTimezone: true` timestamps. If auth.ts config
+// changes (new fields, renamed models), regenerate and re-diff rather than
+// hand-editing blind.
 
 import {
+  boolean,
   date,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -33,22 +40,115 @@ export const devicePlatformEnum = pgEnum("device_platform", [
   "android",
 ]);
 
-// --- Identity -------------------------------------------------------------
+// --- Identity / auth --------------------------------------------------
+//
+// `users` mixes three kinds of columns: Better Auth's own core fields
+// (id, displayName, email, emailVerified, image, createdAt, updatedAt),
+// this app's fields (avatarKey), and the E2EE identity keypair fields
+// Better Auth doesn't know about but stores for us via `additionalFields`
+// (see docs/ENCRYPTION.md). `sessions`/`accounts`/`verifications` are
+// entirely Better Auth's — `accounts` is where the hashed password lives
+// for email+password login (one row per user, providerId "credential"),
+// not on `users` itself.
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
-  email: text("email").notNull().unique(),
   displayName: text("display_name").notNull(),
-  avatarKey: text("avatar_key"),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  // Better Auth's generic profile-picture field. Unused for now — avatar
+  // upload isn't built yet, and `avatarKey` below (an R2 key, not a URL)
+  // is what that feature will actually use once it exists.
+  image: text("image"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+
+  avatarKey: text("avatar_key"),
 
   // E2EE identity keypair — see docs/ENCRYPTION.md.
   publicKey: text("public_key").notNull(),
   encryptedPrivateKey: text("encrypted_private_key").notNull(),
   kdfSalt: text("kdf_salt").notNull(),
 });
+
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("sessions_user_id_idx").on(t.userId)],
+);
+
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    password: text("password"), // hashed, only set for providerId "credential"
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", {
+      withTimezone: true,
+    }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+      withTimezone: true,
+    }),
+    scope: text("scope"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("accounts_user_id_idx").on(t.userId)],
+);
+
+// Short-lived tokens for flows like email verification / password reset —
+// not user-facing accounts, no FK to `users` (identified by `identifier`,
+// e.g. an email address, before an account necessarily exists).
+export const verifications = pgTable(
+  "verifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("verifications_identifier_idx").on(t.identifier)],
+);
 
 // --- Groups -----------------------------------------------------------
 

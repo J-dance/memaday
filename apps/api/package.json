@@ -9,11 +9,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.7.4",
     "@memaday/core": "workspace:*",
     "@memaday/db": "workspace:*",
+    "better-auth": "^1.7.4",
     "hono": "^4.6.16"
   },
   "devDependencies": {
+    "@better-auth/cli": "^1.4.21",
     "@cloudflare/workers-types": "^5.0.0",
     "typescript": "^5.7.3",
     "wrangler": "^4.0.0"

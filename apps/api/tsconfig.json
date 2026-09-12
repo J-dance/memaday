@@ -2,6 +2,13 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
+    // Unlike packages/*, this is a deployed app, not a workspace dependency
+    // other packages import — nothing consumes its .d.ts output, so it
+    // doesn't need declaration emit. (Also sidesteps a TS2742 with Better
+    // Auth's inferred types under pnpm's nested node_modules layout, which
+    // only surfaces when declaration-emit checking is on.)
+    "declaration": false,
+    "declarationMap": false,
     "types": ["@cloudflare/workers-types"]
   },
   "include": ["src"]

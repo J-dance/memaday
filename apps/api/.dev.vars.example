@@ -1,0 +1,9 @@
+# Wrangler reads `.dev.vars` (not committed) for local `wrangler dev` secrets.
+# Copy this file to `.dev.vars` and fill in real values.
+
+# Same connection string as packages/db/.env — see that file's example.
+DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
+
+# Any random string for local dev; generate with:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+BETTER_AUTH_SECRET=
