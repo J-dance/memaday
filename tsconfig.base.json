@@ -3,14 +3,22 @@
     "target": "ES2022",
     "lib": ["ES2022"],
     "module": "ESNext",
+    // "Bundler" matches how modules are actually resolved in this repo (Vite/Expo/Wrangler),
+    // as opposed to "Node16", which would also require file extensions on relative imports.
     "moduleResolution": "Bundler",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
+    // Catches `arr[i]` access that TS would otherwise type as non-optional even
+    // though out-of-bounds access returns undefined at runtime.
     "noUncheckedIndexedAccess": true,
     "resolveJsonModule": true,
+    // Required by Bundler-style toolchains (esbuild, swc, etc.) that transpile files
+    // independently and can't see across files to resolve const enums / type-only re-exports.
     "isolatedModules": true,
+    // Emits .d.ts (and .d.ts.map) files so packages/* can be consumed as typed
+    // dependencies by other workspace packages, not just by their own build output.
     "declaration": true,
     "declarationMap": true
   }
