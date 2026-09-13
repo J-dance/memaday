@@ -380,6 +380,71 @@ again.
 
 ---
 
+### Separate AEAD nonce for the caption
+
+**Decision:** `photos` has two nonce columns — `nonce` for the photo
+bytes' ciphertext and `caption_nonce` for the caption's ciphertext
+(nullable, matching `caption`'s own nullability) — rather than one shared
+`nonce` column for the row.
+
+**Why:** Caught while starting the client-side encryption pipeline (step 4
+of [`ROADMAP.md`](ROADMAP.md)): the photo bytes and the caption are two
+independent ciphertexts, both encrypted under the same group symmetric
+key, but the original schema had only one `nonce` column for the whole
+row. AEAD ciphers (XChaCha20-Poly1305 here — see
+[`ENCRYPTION.md`](ENCRYPTION.md)) are only safe when a given (key, nonce)
+pair is never reused; encrypting two different plaintexts under the same
+key *and* the same nonce can leak the XOR of both plaintexts and allow
+ciphertext forgery. This had shipped in the schema and in
+`POST /v1/photos/confirm` before the client encryption code that would
+have actually triggered the bug existed — see the "how did this not get
+picked up before" discussion in conversation: the nonce was named and
+documented as "for this photo's ciphertext" specifically, and nobody
+revisited that scoping when `caption` was added as a second ciphertext on
+the same row.
+
+**Migration:** `packages/db/migrations/0001_soft_kitty_pryde.sql`, applied
+to the dev database. `POST /v1/photos/confirm` and
+`GET /v1/groups/:groupId/photos` were updated to read/write `captionNonce`
+alongside `caption`.
+
+**Lesson for future schema changes:** whenever a row holds more than one
+independently-encrypted field, each needs its own nonce column — a single
+`nonce` column is only correct when there's exactly one ciphertext per
+row. Worth checking against this whenever a new encrypted field is added
+anywhere in the schema, not just re-deriving it from scratch each time.
+
+---
+
+### R2 bucket needs an explicit CORS policy for browser uploads/downloads
+
+**Decision:** The `memaday-photos-dev` R2 bucket has a CORS policy (set via
+`wrangler r2 bucket cors set`) allowing `GET`/`PUT`/`HEAD` from
+`http://localhost:8081`, the web app's dev origin.
+
+**Why:** Caught while browser-testing the client upload pipeline for the
+first time — every earlier presign/confirm/list test in this project used
+`curl`, which doesn't enforce CORS, so this gap was invisible until a real
+browser tried to `PUT` ciphertext to a presigned R2 URL and Chrome blocked
+it: "No 'Access-Control-Allow-Origin' header is present on the requested
+resource." A presigned URL only authorizes the *request signature* — it
+says nothing about whether a browser is allowed to make the cross-origin
+call in the first place, that's a separate, bucket-level policy. Without
+it, presigned uploads/downloads work from any non-browser client (curl, a
+backend) but are silently blocked from the one client that actually needs
+them.
+
+**Implication for later environments:** staging and prod will each need
+their own CORS policy on their own bucket, listing that environment's
+actual deployed web origin — the same "each environment configures its
+own thing" pattern already true of `WEB_ORIGIN` in `wrangler.jsonc` (see
+`docs/ARCHITECTURE.md#environments`). Easy to forget since it's set via a
+one-off `wrangler` command, not committed config — worth checking for
+explicitly when standing up staging/prod in
+[`ROADMAP.md`](ROADMAP.md) step 8.
+
+---
+
 ### Staging environment set up now, on a `staging` branch, before deploy CI exists
 
 **Decision:** A full staging environment (Neon branch, separate Worker,

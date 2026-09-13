@@ -52,6 +52,7 @@ photosRoute.post("/confirm", async (c) => {
     width: number;
     height: number;
     caption?: string;
+    captionNonce?: string;
   }>();
 
   if (
@@ -63,6 +64,14 @@ photosRoute.post("/confirm", async (c) => {
   ) {
     throw new HTTPException(400, {
       message: "photoId, groupId, nonce, width, and height are required",
+    });
+  }
+  // caption and captionNonce are a matched pair — see docs/ENCRYPTION.md's
+  // "every ciphertext gets its own nonce" note. Neither makes sense
+  // without the other.
+  if (Boolean(body.caption) !== Boolean(body.captionNonce)) {
+    throw new HTTPException(400, {
+      message: "caption and captionNonce must be provided together",
     });
   }
 
@@ -88,6 +97,7 @@ photosRoute.post("/confirm", async (c) => {
       height: body.height,
       nonce: body.nonce,
       caption: body.caption ?? null,
+      captionNonce: body.captionNonce ?? null,
       state: "ready",
     })
     .onConflictDoNothing();
@@ -100,6 +110,7 @@ photosRoute.post("/confirm", async (c) => {
       width: body.width,
       height: body.height,
       caption: body.caption ?? null,
+      captionNonce: body.captionNonce ?? null,
       state: "ready",
     },
     201,

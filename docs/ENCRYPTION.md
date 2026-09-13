@@ -118,8 +118,21 @@ group_members" would be.
 | Data | Encrypted with | Where |
 |---|---|---|
 | Photo bytes | Group symmetric key (XChaCha20-Poly1305), random nonce per photo | Client, before upload to R2 |
-| Comment text | Same group symmetric key | Client, before sending to API |
-| Photo nonce | — (not secret, stored alongside ciphertext) | Postgres, on the `photos` row |
+| Caption | Same group symmetric key, its own random nonce | Client, before calling `/photos/confirm` |
+| Comment text | Same group symmetric key, its own random nonce | Client, before sending to API |
+| Nonces | — (not secret, stored alongside their ciphertext) | Postgres, on the `photos`/`comments` row |
+
+**Every ciphertext gets its own nonce, even ones under the same key.**
+AEAD ciphers like XChaCha20-Poly1305 are only safe if a (key, nonce) pair
+is never reused — reusing one nonce for two different plaintexts under the
+same key can leak the XOR of both plaintexts and let an attacker forge
+ciphertexts. A photo's bytes and its caption are two independent
+ciphertexts encrypted under the *same* group key, so they need two
+independent nonces — that's why `photos` has both `nonce` (for the bytes)
+and `caption_nonce` (for the caption), not one shared column. This was
+missed in an earlier pass (a single `nonce` column was added when photos
+were designed, and `caption` was added later without revisiting it) — see
+[`DECISIONS.md`](DECISIONS.md#separate-aead-nonce-for-the-caption).
 
 **Consequences worth naming up front:**
 

@@ -212,8 +212,14 @@ export const photos = pgTable("photos", {
   storageKey: text("storage_key").notNull(),
   width: integer("width").notNull(),
   height: integer("height").notNull(),
-  nonce: text("nonce").notNull(), // AEAD nonce for this photo's ciphertext
+  nonce: text("nonce").notNull(), // AEAD nonce for the photo bytes' ciphertext
   caption: text("caption"), // ciphertext, or null
+  // A second, independent AEAD nonce for `caption` — required because it's
+  // a second ciphertext under the same group key as the photo bytes, and
+  // AEAD nonces must never repeat under one key (see docs/DECISIONS.md's
+  // "Separate AEAD nonce for the caption" entry). Null exactly when
+  // `caption` is null.
+  captionNonce: text("caption_nonce"),
   state: photoStateEnum("state").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

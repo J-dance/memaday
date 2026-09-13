@@ -57,7 +57,8 @@ group_members(group_id, user_id, role, joined_at)              -- composite PK
 group_keys(group_id, user_id, wrapped_key)                     -- see ENCRYPTION.md
 
 photos(id, group_id, uploader_id, storage_key, width, height,
-       nonce, caption, state: pending|ready|shown|purged, created_at)
+       nonce, caption, caption_nonce, state: pending|ready|shown|purged,
+       created_at)
 
 daily_selections(id, group_id, photo_id, local_date, starts_at,
                   expires_at, purge_after)                     -- UNIQUE(group_id, local_date); purge_after = starts_at + 12h

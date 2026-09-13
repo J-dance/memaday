@@ -8,3 +8,4 @@ export const CORE_PACKAGE_NAME = "@memaday/core";
 export * from "./identity.js";
 export * from "./group-key.js";
 export * from "./invite-code.js";
+export * from "./photo.js";

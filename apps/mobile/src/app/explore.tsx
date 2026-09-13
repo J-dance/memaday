@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 
 import { generateGroupKey, unwrapGroupKey, wrapGroupKey } from '@memaday/core';
 
@@ -15,6 +16,7 @@ import {
   submitGroupKey,
   type GroupSummary,
 } from '@/lib/groups-client';
+import { fetchAndDecryptGroupPhotos, pickAndUploadPhoto, type DecryptedPhoto } from '@/lib/photo-pipeline';
 import { useGroupKeysSession } from '@/lib/group-keys-session';
 import { useIdentitySession } from '@/lib/identity-session';
 import { Spacing, MaxContentWidth } from '@/constants/theme';
@@ -93,7 +95,7 @@ export default function GroupsScreen() {
               </ThemedText>
             )}
             {groups.map((group) => (
-              <GroupRow key={group.id} group={group} hasKey={Boolean(getGroupKey(group.id))} />
+              <GroupRow key={group.id} group={group} groupKey={getGroupKey(group.id)} />
             ))}
           </ThemedView>
         )}
@@ -121,14 +123,75 @@ export default function GroupsScreen() {
   );
 }
 
-function GroupRow({ group, hasKey }: { group: GroupSummary; hasKey: boolean }) {
+function GroupRow({ group, groupKey }: { group: GroupSummary; groupKey: Uint8Array | undefined }) {
+  const [photos, setPhotos] = useState<DecryptedPhoto[] | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshPhotos = useCallback(async () => {
+    if (!groupKey) return;
+    try {
+      setPhotos(await fetchAndDecryptGroupPhotos(group.id, groupKey));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load photos');
+    }
+  }, [group.id, groupKey]);
+
+  useEffect(() => {
+    refreshPhotos();
+  }, [refreshPhotos]);
+
+  async function handleUpload() {
+    if (!groupKey) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const confirmed = await pickAndUploadPhoto(group.id, groupKey);
+      if (confirmed) await refreshPhotos();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not upload photo');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <ThemedView type="backgroundElement" style={styles.groupRow}>
       <ThemedText type="smallBold">{group.name}</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
-        {hasKey ? '🔓 unlocked' : '🔒 waiting for a member to let you in'}
+        {groupKey ? '🔓 unlocked' : '🔒 waiting for a member to let you in'}
       </ThemedText>
       <ThemedText type="code">invite code: {group.inviteCode}</ThemedText>
+
+      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+
+      {groupKey && (
+        <>
+          <Pressable style={styles.uploadButton} onPress={handleUpload} disabled={uploading}>
+            {uploading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <ThemedText type="smallBold" style={styles.buttonLabel}>
+                Add photo
+              </ThemedText>
+            )}
+          </Pressable>
+
+          {photos === null ? (
+            <ActivityIndicator />
+          ) : photos.length === 0 ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              No photos yet — be the first to add one.
+            </ThemedText>
+          ) : (
+            <ScrollView horizontal style={styles.photoRow}>
+              {photos.map((photo) => (
+                <Image key={photo.id} source={{ uri: photo.dataUri }} style={styles.thumbnail} />
+              ))}
+            </ScrollView>
+          )}
+        </>
+      )}
     </ThemedView>
   );
 }
@@ -250,6 +313,23 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     alignSelf: 'flex-start',
+  },
+  uploadButton: {
+    backgroundColor: '#3c87f7',
+    borderRadius: Spacing.two,
+    paddingVertical: Spacing.two,
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.three,
+  },
+  photoRow: {
+    flexDirection: 'row',
+  },
+  thumbnail: {
+    width: 72,
+    height: 72,
+    borderRadius: Spacing.one,
+    marginRight: Spacing.one,
   },
   form: {
     alignSelf: 'stretch',

@@ -188,6 +188,7 @@ groupsRoute.get("/:groupId/photos", async (c) => {
       height: photos.height,
       nonce: photos.nonce,
       caption: photos.caption,
+      captionNonce: photos.captionNonce,
       createdAt: photos.createdAt,
     })
     .from(photos)
