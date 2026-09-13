@@ -1,180 +1,280 @@
-import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
-import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ExternalLink } from '@/components/external-link';
+import { generateGroupKey, unwrapGroupKey, wrapGroupKey } from '@memaday/core';
+
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Collapsible } from '@/components/ui/collapsible';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { authClient } from '@/lib/auth-client';
+import {
+  createGroup,
+  joinGroup,
+  listGroups,
+  listPendingMembers,
+  submitGroupKey,
+  type GroupSummary,
+} from '@/lib/groups-client';
+import { useGroupKeysSession } from '@/lib/group-keys-session';
+import { useIdentitySession } from '@/lib/identity-session';
+import { Spacing, MaxContentWidth } from '@/constants/theme';
 
-export default function TabTwoScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
-  };
-  const theme = useTheme();
+// Whenever a key-holding member's client sees a group, it checks for
+// members waiting to be let in and wraps+uploads a key for each — silently,
+// no approval prompt (docs/DECISIONS.md's "automatic admit" choice). This
+// runs after every group-list refresh rather than on a timer, since
+// there's no push/realtime infra yet (see docs/ARCHITECTURE.md).
+async function admitPendingMembers(groupId: string, groupKey: Uint8Array) {
+  const pending = await listPendingMembers(groupId);
+  for (const member of pending) {
+    const wrappedKey = await wrapGroupKey(groupKey, member.publicKey);
+    await submitGroupKey(groupId, member.userId, wrappedKey);
+  }
+}
 
-  const contentPlatformStyle = Platform.select({
-    android: {
-      paddingTop: insets.top,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
-      paddingBottom: insets.bottom,
-    },
-    web: {
-      paddingTop: Spacing.six,
-      paddingBottom: Spacing.four,
-    },
-  });
+export default function GroupsScreen() {
+  const { privateKey } = useIdentitySession();
+  const { data: session } = authClient.useSession();
+  const { getGroupKey, setGroupKey } = useGroupKeysSession();
+
+  const [groups, setGroups] = useState<GroupSummary[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = useCallback(async () => {
+    if (!session || !privateKey) return;
+    setRefreshing(true);
+    setError(null);
+    try {
+      const fetched = await listGroups();
+      setGroups(fetched);
+
+      for (const group of fetched) {
+        if (!group.wrappedKey) continue;
+
+        let groupKey = getGroupKey(group.id);
+        if (!groupKey) {
+          groupKey = await unwrapGroupKey(group.wrappedKey, session.user.publicKey, privateKey);
+          setGroupKey(group.id, groupKey);
+        }
+
+        // Best-effort: one member's client failing to admit shouldn't block
+        // the rest of the screen from loading.
+        await admitPendingMembers(group.id, groupKey).catch(() => {});
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load groups');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [session, privateKey, getGroupKey, setGroupKey]);
+
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user.id]);
 
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
+    <SafeAreaView style={styles.safeArea}>
       <ThemedView style={styles.container}>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="subtitle">Explore</ThemedText>
-          <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
-          </ThemedText>
+        <ThemedText type="title" style={styles.title}>
+          Groups
+        </ThemedText>
 
-          <ExternalLink href="https://docs.expo.dev" asChild>
-            <Pressable style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView type="backgroundElement" style={styles.linkButton}>
-                <ThemedText type="link">Expo documentation</ThemedText>
-                <SymbolView
-                  tintColor={theme.text}
-                  name={{ ios: 'arrow.up.right.square', android: 'link', web: 'link' }}
-                  size={12}
-                />
-              </ThemedView>
-            </Pressable>
-          </ExternalLink>
-        </ThemedView>
+        {error && <ThemedText style={styles.error}>{error}</ThemedText>}
 
-        <ThemedView style={styles.sectionsWrapper}>
-          <Collapsible title="File-based routing">
-            <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
-            </ThemedText>
-            <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/router/introduction">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Android, iOS, and web support">
-            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
-              <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
+        {groups === null ? (
+          <ActivityIndicator />
+        ) : (
+          <ThemedView style={styles.groupList}>
+            {groups.length === 0 && (
+              <ThemedText type="small" themeColor="textSecondary">
+                No groups yet — create one or join with an invite code.
               </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
-              />
-            </ThemedView>
-          </Collapsible>
+            )}
+            {groups.map((group) => (
+              <GroupRow key={group.id} group={group} hasKey={Boolean(getGroupKey(group.id))} />
+            ))}
+          </ThemedView>
+        )}
 
-          <Collapsible title="Images">
-            <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
+        <Pressable style={styles.refreshButton} onPress={refresh} disabled={refreshing}>
+          {refreshing ? (
+            <ActivityIndicator />
+          ) : (
+            <ThemedText type="link" themeColor="textSecondary">
+              Refresh
             </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+          )}
+        </Pressable>
 
-          <Collapsible title="Light and dark mode components">
-            <ThemedText type="small">
-              This template has light and dark mode support. The{' '}
-              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
-              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Animations">
-            <ThemedText type="small">
-              This template includes an example of an animated component. The{' '}
-              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
-              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
-              animate opening this hint.
-            </ThemedText>
-          </Collapsible>
-        </ThemedView>
-        {Platform.OS === 'web' && <WebBadge />}
+        <CreateGroupForm
+          ownPublicKey={session?.user.publicKey}
+          onCreated={async (id, key) => {
+            setGroupKey(id, key);
+            await refresh();
+          }}
+        />
+        <JoinGroupForm onJoined={refresh} />
       </ThemedView>
-    </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function GroupRow({ group, hasKey }: { group: GroupSummary; hasKey: boolean }) {
+  return (
+    <ThemedView type="backgroundElement" style={styles.groupRow}>
+      <ThemedText type="smallBold">{group.name}</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        {hasKey ? '🔓 unlocked' : '🔒 waiting for a member to let you in'}
+      </ThemedText>
+      <ThemedText type="code">invite code: {group.inviteCode}</ThemedText>
+    </ThemedView>
+  );
+}
+
+function CreateGroupForm({
+  ownPublicKey,
+  onCreated,
+}: {
+  ownPublicKey: string | undefined;
+  onCreated: (groupId: string, groupKey: Uint8Array) => void;
+}) {
+  const [name, setName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleCreate() {
+    if (!ownPublicKey) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const groupKey = await generateGroupKey();
+      const wrappedKeyForSelf = await wrapGroupKey(groupKey, ownPublicKey);
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const created = await createGroup({ name, timezone, wrappedKeyForSelf });
+      setName('');
+      onCreated(created.id, groupKey);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create group');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <ThemedView type="backgroundElement" style={styles.form}>
+      <ThemedText type="smallBold">Create a group</ThemedText>
+      <TextInput placeholder="Group name" value={name} onChangeText={setName} style={styles.input} />
+      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+      <Pressable style={styles.button} onPress={handleCreate} disabled={submitting || !name}>
+        {submitting ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <ThemedText type="smallBold" style={styles.buttonLabel}>
+            Create
+          </ThemedText>
+        )}
+      </Pressable>
+    </ThemedView>
+  );
+}
+
+function JoinGroupForm({ onJoined }: { onJoined: () => void }) {
+  const [inviteCode, setInviteCode] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleJoin() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await joinGroup(inviteCode.trim().toUpperCase());
+      setInviteCode('');
+      onJoined();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not join group');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <ThemedView type="backgroundElement" style={styles.form}>
+      <ThemedText type="smallBold">Join a group</ThemedText>
+      <TextInput
+        placeholder="Invite code"
+        autoCapitalize="characters"
+        value={inviteCode}
+        onChangeText={setInviteCode}
+        style={styles.input}
+      />
+      {error && <ThemedText style={styles.error}>{error}</ThemedText>}
+      <Pressable style={styles.button} onPress={handleJoin} disabled={submitting || !inviteCode}>
+        {submitting ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <ThemedText type="smallBold" style={styles.buttonLabel}>
+            Join
+          </ThemedText>
+        )}
+      </Pressable>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
+  safeArea: {
     flex: 1,
   },
-  contentContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
   container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
-  },
-  titleContainer: {
-    gap: Spacing.three,
+    flex: 1,
     alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.six,
-  },
-  centerText: {
-    textAlign: 'center',
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  linkButton: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
-    justifyContent: 'center',
-    gap: Spacing.one,
-    alignItems: 'center',
-  },
-  sectionsWrapper: {
-    gap: Spacing.five,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
-  },
-  collapsibleContent: {
-    alignItems: 'center',
-  },
-  imageTutorial: {
     width: '100%',
-    aspectRatio: 296 / 171,
-    borderRadius: Spacing.three,
-    marginTop: Spacing.two,
-  },
-  imageReact: {
-    width: 100,
-    height: 100,
+    maxWidth: MaxContentWidth,
     alignSelf: 'center',
+    paddingHorizontal: Spacing.four,
+    gap: Spacing.three,
+  },
+  title: {
+    marginTop: Spacing.four,
+  },
+  groupList: {
+    alignSelf: 'stretch',
+    gap: Spacing.two,
+  },
+  groupRow: {
+    borderRadius: Spacing.two,
+    padding: Spacing.three,
+    gap: Spacing.one,
+  },
+  refreshButton: {
+    alignSelf: 'flex-start',
+  },
+  form: {
+    alignSelf: 'stretch',
+    borderRadius: Spacing.two,
+    padding: Spacing.three,
+    gap: Spacing.two,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#88888844',
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    fontSize: 16,
+  },
+  button: {
+    backgroundColor: '#3c87f7',
+    borderRadius: Spacing.two,
+    paddingVertical: Spacing.two,
+    alignItems: 'center',
+  },
+  buttonLabel: {
+    color: '#ffffff',
+  },
+  error: {
+    color: '#e5484d',
   },
 });

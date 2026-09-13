@@ -25,11 +25,21 @@ repo state before assuming a step is fully done, this list can drift.
    didn't" unlock-only path — see [`ENCRYPTION.md`](ENCRYPTION.md).
    Verified end-to-end against a real Neon database and `wrangler dev`, not
    just typechecked.
-3. **Groups + key exchange** — create group (generates + wraps the group
-   key for the creator), join by invite code, and the "existing member
-   wraps the key for a new member" handoff flow. The trickiest non-crypto
-   part of the whole build — worth its own milestone rather than folding
-   into generic "groups" work.
+3. **✅ Groups + key exchange** — create group (`POST /v1/groups`, generates
+   + wraps the group key for the creator in one atomic `db.batch()`), join
+   by invite code (`POST /v1/groups/join`, membership only — no key yet),
+   and the "existing member wraps the key for a new member" handoff flow
+   (`GET /v1/groups/:id/pending-members` + `POST /v1/groups/:id/keys`,
+   silent/automatic — see
+   [`DECISIONS.md`](DECISIONS.md#new-members-are-admitted-to-a-group-silently-not-via-an-approval-prompt)).
+   Crypto in `packages/core/src/group-key.ts`
+   (`crypto_box_seal`/`crypto_box_seal_open`), tested. `apps/mobile`'s
+   Groups tab (repurposed from the Expo template's Explore tab) can
+   create, join, and auto-admit. Verified end-to-end with a two-identity
+   integration check against the real API (not just single-user
+   browser-clicking) — member B ends up with the exact same group key
+   member A generated, and a non-member is correctly forbidden from the
+   pending-members/keys routes.
 4. **Photo upload (encrypted)** — client-side downsize + EXIF strip +
    encrypt, presigned R2 upload flow, `POST /photos/confirm` with nonce,
    list + decrypt a group's photo pool.

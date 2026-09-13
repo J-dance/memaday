@@ -3,10 +3,7 @@
 // keypair, and lock/unlock its private key with a key derived from the
 // user's password so the server only ever stores ciphertext it can't read.
 
-// The plain `libsodium-wrappers` build excludes Argon2id (`crypto_pwhash`)
-// to keep bundle size down for callers who don't need it — this app does,
-// so it needs the "sumo" build (the full libsodium API).
-import sodium from "libsodium-wrappers-sumo";
+import { fromBase64, loadSodium, toBase64 } from "./codec.js";
 
 export interface IdentityKeypair {
   /** X25519 public key, base64 — safe to upload as `users.public_key`. */
@@ -15,19 +12,6 @@ export interface IdentityKeypair {
   encryptedPrivateKey: string;
   /** Argon2id salt, base64 — safe to upload as `users.kdf_salt`. */
   kdfSalt: string;
-}
-
-async function loadSodium() {
-  await sodium.ready;
-  return sodium;
-}
-
-function toBase64(bytes: Uint8Array): string {
-  return sodium.to_base64(bytes, sodium.base64_variants.ORIGINAL);
-}
-
-function fromBase64(value: string): Uint8Array {
-  return sodium.from_base64(value, sodium.base64_variants.ORIGINAL);
 }
 
 // INTERACTIVE limits (~ms-scale, not the STRONGEST/MODERATE limits meant

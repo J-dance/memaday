@@ -5,6 +5,7 @@ import { useColorScheme } from 'react-native';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
 import { AuthGate } from '@/components/auth-gate';
+import { GroupKeysSessionProvider } from '@/lib/group-keys-session';
 import { IdentitySessionProvider } from '@/lib/identity-session';
 
 SplashScreen.preventAutoHideAsync();
@@ -15,9 +16,11 @@ export default function TabLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AnimatedSplashOverlay />
       <IdentitySessionProvider>
-        <AuthGate>
-          <AppTabs />
-        </AuthGate>
+        <GroupKeysSessionProvider>
+          <AuthGate>
+            <AppTabs />
+          </AuthGate>
+        </GroupKeysSessionProvider>
       </IdentitySessionProvider>
     </ThemeProvider>
   );

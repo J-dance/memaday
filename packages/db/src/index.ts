@@ -4,6 +4,15 @@ import * as schema from "./schema.js";
 
 export * from "./schema.js";
 
+// Query-building helpers, re-exported rather than left for apps/api to
+// install its own `drizzle-orm` dependency: pnpm's strict node_modules
+// resolves that as a *separate* instance (different peer-dependency hash
+// from this package's copy), and TypeScript then treats their `Column`/`SQL`
+// types as structurally incompatible — every `eq(...)`/`and(...)` call
+// fails to typecheck across the package boundary. Importing everything
+// through this one instance avoids that entirely.
+export { and, asc, desc, eq, isNull, isNotNull, ne, or, sql } from "drizzle-orm";
+
 // Neon's HTTP driver, not a raw TCP `pg` connection: Cloudflare Workers
 // can't hold a pooled TCP socket open the way a long-running Node server
 // would, so this speaks to Neon over plain HTTP/fetch instead. Trade-off:

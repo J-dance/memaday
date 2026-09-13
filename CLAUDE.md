@@ -10,18 +10,23 @@ once a day a photo is randomly selected for the group to view and comment
 on; when the next one is selected, the previous photo and its comments are
 hard-deleted everywhere.
 
-**Current status: email+password auth + the E2EE identity keypair work
-end-to-end; no other product features yet.** `apps/api` is a Hono skeleton
-with `/v1/health` plus Better Auth mounted at `/v1/auth` (CORS +
-`trustedOrigins` scoped to `WEB_ORIGIN` — see
-[`docs/DECISIONS.md`](docs/DECISIONS.md)). `apps/mobile` still has Expo's
-default template screens behind the gate, but sign-up/sign-in/unlock now
-work (`src/components/auth-gate.tsx`), calling
-`packages/core/src/identity.ts` for the X25519 keypair + Argon2id
-password-locking (docs/ENCRYPTION.md). `packages/db`'s schema (including
-Better Auth's own tables) is migrated to a real Neon database. Still
-verify against the actual repo state before assuming specifics — this file
-is a summary, not a substitute for reading the code.
+**Current status: auth + identity keys + group creation/join/key-exchange
+work end-to-end; photo upload and rotation aren't built yet.** `apps/api`
+is a Hono app with `/v1/health`, Better Auth at `/v1/auth` (CORS +
+`trustedOrigins` scoped to `WEB_ORIGIN`), and `/v1/groups` routes
+(`apps/api/src/routes/groups.ts`) for create/join/pending-members/admit.
+`apps/mobile` has functional (not polished) sign-up/sign-in/unlock
+(`src/components/auth-gate.tsx`) and a Groups tab (repurposed from the
+Expo template's Explore tab, `src/app/explore.tsx`) for creating/joining
+groups, with new members silently auto-admitted by any online key-holding
+member's client — see
+[`docs/DECISIONS.md`](docs/DECISIONS.md#new-members-are-admitted-to-a-group-silently-not-via-an-approval-prompt).
+Crypto (identity keypair + group-key wrapping) lives in `packages/core/src/`
+(`identity.ts`, `group-key.ts`, `invite-code.ts`), tested, and was also
+verified with a two-identity integration check against the real API and
+Neon database — not just single-user browser clicking. Still verify
+against the actual repo state before assuming specifics — this file is a
+summary, not a substitute for reading the code.
 
 Read these before making architectural suggestions or writing code:
 
