@@ -2,38 +2,23 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
   and,
+  asc,
   createDb,
   eq,
   groupKeys,
   groupMembers,
   groups,
   isNull,
+  photos,
   users,
 } from "@memaday/db";
 import { generateInviteCode } from "@memaday/core";
 import { requireUser } from "../session.js";
+import { assertHoldsGroupKey } from "../group-membership.js";
+import { presignPhotoDownload } from "../r2.js";
 import type { Bindings } from "../bindings.js";
 
 export const groupsRoute = new Hono<{ Bindings: Bindings }>();
-
-// A member is only trusted to see (and wrap keys for) a group's pending
-// members once they hold the group key themselves — see
-// docs/ENCRYPTION.md#3-adding-a-member. Someone who just joined and is
-// still waiting on their own key can't reach this.
-async function assertHoldsGroupKey(
-  db: ReturnType<typeof createDb>,
-  groupId: string,
-  userId: string,
-) {
-  const own = await db.query.groupKeys.findFirst({
-    where: and(eq(groupKeys.groupId, groupId), eq(groupKeys.userId, userId)),
-  });
-  if (!own) {
-    throw new HTTPException(403, {
-      message: "Not a key-holding member of this group",
-    });
-  }
-}
 
 // Creates a group and, in the same request, records the creator's own
 // wrapped copy of the group key it just generated client-side — one
@@ -175,6 +160,51 @@ groupsRoute.get("/:groupId/pending-members", async (c) => {
     .where(and(eq(groupMembers.groupId, groupId), isNull(groupKeys.wrappedKey)));
 
   return c.json(pending);
+});
+
+// The group's photo pool — everything uploaded and not yet shown or
+// purged (`state: "ready"`). "Shown" (today's selected photo) and "purged"
+// aren't part of this list; those belong to the daily-selection screen
+// (docs/ROADMAP.md step 6), not the upload pool. Requires holding the group
+// key for the same reason presign/confirm do (docs/ENCRYPTION.md) — a
+// download URL is useless without the key to decrypt what it fetches, but
+// this also keeps the URLs themselves from being handed to a keyless
+// pending member. One presigned GET URL is signed per photo, per call —
+// see docs/DECISIONS.md's "Photo downloads use presigned GET URLs too"
+// entry for why this isn't a public bucket instead.
+groupsRoute.get("/:groupId/photos", async (c) => {
+  const user = await requireUser(c);
+  const groupId = c.req.param("groupId");
+  const db = createDb(c.env.DATABASE_URL);
+
+  await assertHoldsGroupKey(db, groupId, user.id);
+
+  const rows = await db
+    .select({
+      id: photos.id,
+      uploaderId: photos.uploaderId,
+      storageKey: photos.storageKey,
+      width: photos.width,
+      height: photos.height,
+      nonce: photos.nonce,
+      caption: photos.caption,
+      createdAt: photos.createdAt,
+    })
+    .from(photos)
+    .where(and(eq(photos.groupId, groupId), eq(photos.state, "ready")))
+    .orderBy(asc(photos.createdAt));
+
+  const withDownloadUrls = await Promise.all(
+    rows.map(async ({ storageKey, ...photo }) => {
+      const { downloadUrl, expiresInSeconds } = await presignPhotoDownload(
+        c.env,
+        storageKey,
+      );
+      return { ...photo, downloadUrl, expiresInSeconds };
+    }),
+  );
+
+  return c.json(withDownloadUrls);
 });
 
 // Uploads a freshly-wrapped key for a pending member. `.onConflictDoNothing()`

@@ -315,6 +315,71 @@ window; it just now also gates login, not only key recovery.
 
 ---
 
+### Presigned R2 uploads via the S3 API, not through the Worker
+
+**Decision:** The client uploads encrypted photo bytes directly to R2 using
+a presigned PUT URL, generated in the Worker via R2's S3-compatible API
+(an R2 API token + request-signing library, e.g. `aws4fetch`) — not
+Cloudflare's native R2 binding, and not by routing bytes through the
+Worker itself.
+
+**Why:** The native R2 *binding* (`env.PHOTOS_BUCKET` in `wrangler.jsonc`)
+only supports reading/writing from code running inside the Worker — it has
+no presigning capability, since presigning is inherently an S3-API concept
+(a signature computed from an access key/secret that R2's S3-compatible
+endpoint can verify without a round trip). Getting a URL the *client* can
+PUT to directly requires that S3 API. This keeps the upload path matching
+the 3-legged flow already documented in
+[`ARCHITECTURE.md`](ARCHITECTURE.md#system-diagram) — ciphertext goes
+client → R2 directly, never through the Worker — which matters here more
+than usual given the E2EE design: routing bytes through the Worker would
+still be "safe" (it's ciphertext either way) but would spend Worker
+CPU/bandwidth on every photo for no privacy benefit.
+
+**Cost accepted:** two different ways of touching the same bucket (the S3
+API for presigned uploads, likely the plain binding for anything read
+server-side later) and a new secret pair (R2 API token's access key +
+secret) to provision per environment, on top of the existing per-environment
+secrets in [`ARCHITECTURE.md#environments`](ARCHITECTURE.md#environments).
+
+**Alternative considered:** Route upload bytes through the Worker (client
+POSTs ciphertext to an API route, which writes it to R2 via the plain
+binding). Simpler auth story, no extra secrets, one code path for the
+bucket. Rejected because it's a real, if modest, deviation from the
+documented direct-to-R2 design for no corresponding benefit — the whole
+point of the presigned-URL leg was to keep photo bytes off our server's
+compute path entirely.
+
+---
+
+### Photo downloads use presigned GET URLs too, not a public bucket
+
+**Decision:** Listing a group's photo pool (`GET /v1/groups/:groupId/photos`)
+returns a short-lived presigned GET URL per photo, signed the same way as
+upload URLs (`presignPhotoDownload` in `apps/api/src/r2.ts`). The R2 bucket
+itself stays fully private — no public-read setting, no `.r2.dev` public
+URL.
+
+**Why:** Confirmed by product owner. The alternative (a public bucket
+returning permanent direct URLs) is simpler and cheaper — no signing per
+photo — and wouldn't leak plaintext either way, since the bytes are
+ciphertext regardless. But it would mean access control lives entirely in
+"the URL is hard to guess" rather than an actual membership check: once a
+URL exists, anyone who has it (a leaked link, browser history, a proxy log)
+can fetch that blob indefinitely until purge, group membership or removal
+notwithstanding. Presigned GETs keep every fetch gated by
+`assertHoldsGroupKey` at the moment the URL is generated, consistent with
+how uploads already work and with the broader E2EE stance in
+[`ENCRYPTION.md`](ENCRYPTION.md) of not trusting the storage layer more
+than necessary.
+
+**Cost accepted:** every list call signs one URL per photo (cheap — local
+HMAC signing, no network round trip per signature) and photo URLs expire,
+so a client holding a stale list needs to re-fetch to get working URLs
+again.
+
+---
+
 ### Staging environment set up now, on a `staging` branch, before deploy CI exists
 
 **Decision:** A full staging environment (Neon branch, separate Worker,

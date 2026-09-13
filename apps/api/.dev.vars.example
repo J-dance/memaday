@@ -7,3 +7,12 @@ DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
 # Any random string for local dev; generate with:
 #   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 BETTER_AUTH_SECRET=
+
+# R2 API token for presigning uploads (S3-compatible access key pair, NOT
+# your global Cloudflare API token) — create one at Cloudflare dashboard >
+# R2 > Manage R2 API Tokens, scoped to just the memaday-photos-dev bucket
+# with Object Read & Write permission. See docs/DECISIONS.md's "Presigned
+# R2 uploads via the S3 API" entry for why this is a separate credential
+# from the account-level R2_ACCOUNT_ID/R2_BUCKET_NAME in wrangler.jsonc.
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=

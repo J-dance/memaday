@@ -12,6 +12,7 @@
     "@better-auth/drizzle-adapter": "^1.7.4",
     "@memaday/core": "workspace:*",
     "@memaday/db": "workspace:*",
+    "aws4fetch": "^1.0.20",
     "better-auth": "^1.7.4",
     "hono": "^4.6.16"
   },

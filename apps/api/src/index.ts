@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { createAuth } from "./auth.js";
 import { groupsRoute } from "./routes/groups.js";
+import { photosRoute } from "./routes/photos.js";
 import type { Bindings } from "./bindings.js";
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -51,5 +52,6 @@ v1.on(["GET", "POST"], "/auth/*", (c) => {
 });
 
 v1.route("/groups", groupsRoute);
+v1.route("/photos", photosRoute);
 
 export default app;
