@@ -262,6 +262,12 @@ export const comments = pgTable("comments", {
     .notNull()
     .references(() => users.id),
   body: text("body").notNull(), // ciphertext
+  // AEAD nonce for `body` — every comment is its own ciphertext under the
+  // same group key as every photo and every other comment, so (per
+  // docs/DECISIONS.md's "Separate AEAD nonce for the caption" entry, which
+  // generalizes to any ciphertext sharing a key) it needs its own nonce,
+  // not a shared or omitted one.
+  nonce: text("nonce").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

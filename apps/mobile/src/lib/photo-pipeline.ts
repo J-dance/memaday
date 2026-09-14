@@ -6,10 +6,10 @@
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import {
-  decryptCaption,
   decryptPhotoBytes,
-  encryptCaption,
+  decryptText,
   encryptPhotoBytes,
+  encryptText,
   photoBytesToDataUri,
 } from '@memaday/core';
 import {
@@ -68,7 +68,7 @@ export async function pickAndUploadPhoto(
   let captionCiphertext: string | undefined;
   let captionNonce: string | undefined;
   if (caption) {
-    const encrypted = await encryptCaption(caption, groupKey);
+    const encrypted = await encryptText(caption, groupKey);
     captionCiphertext = encrypted.ciphertext;
     captionNonce = encrypted.nonce;
   }
@@ -113,7 +113,7 @@ async function decryptOne(photo: GroupPhoto, groupKey: Uint8Array): Promise<Decr
 
   const caption =
     photo.caption && photo.captionNonce
-      ? await decryptCaption(photo.caption, photo.captionNonce, groupKey)
+      ? await decryptText(photo.caption, photo.captionNonce, groupKey)
       : null;
 
   return { id: photo.id, uploaderId: photo.uploaderId, dataUri, caption, createdAt: photo.createdAt };

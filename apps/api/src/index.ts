@@ -4,6 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import { createAuth } from "./auth.js";
 import { groupsRoute } from "./routes/groups.js";
 import { photosRoute } from "./routes/photos.js";
+import { selectionRoute } from "./routes/selection.js";
 import { runScheduled } from "./rotation.js";
 import type { Bindings } from "./bindings.js";
 
@@ -54,6 +55,11 @@ v1.on(["GET", "POST"], "/auth/*", (c) => {
 
 v1.route("/groups", groupsRoute);
 v1.route("/photos", photosRoute);
+// Mounted at the same "/groups" base as groupsRoute above — a separate
+// file (today's selection, comments, views) rather than more routes piled
+// into groups.ts, but the same URL space (/v1/groups/:groupId/today/...)
+// since it's still fundamentally "stuff about one group."
+v1.route("/groups", selectionRoute);
 
 export default {
   fetch: app.fetch,

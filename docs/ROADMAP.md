@@ -83,10 +83,39 @@ repo state before assuming a step is fully done, this list can drift.
    group was untouched, and the old selection's photo row, selection row,
    and comment were all gone. A second sweep changed nothing (idempotency
    confirmed).
-6. **Today's-photo screen + comments** — the main daily view, decrypt +
-   display, encrypted comment thread, view tracking ("who's seen today's
-   photo"), and an explicit save/download action — saving the photo is
-   encouraged, not something the client tries to prevent.
+6. **✅ Today's-photo screen + comments** — `apps/api/src/routes/selection.ts`
+   adds `GET /v1/groups/:id/today` (the group's most recent selection,
+   with a presigned download URL and the list of who's viewed it),
+   `POST .../today/view`, and `GET`/`POST .../today/comments`. A
+   selection's "current" definition is just "most recent by `startsAt`" —
+   during the ~12h post-rotation overlap window (step 5) an older,
+   not-yet-purged row can still exist, but the newest is always what's
+   shown. `comments` gained its own `nonce` column (migration `0003`) —
+   each comment is its own ciphertext under the group key, same reasoning
+   as the photo caption's separate nonce. Caption encryption was
+   generalized into `packages/core/src/encryption.ts`'s `encryptText`/
+   `decryptText` (moved out of `photo.ts`, since a caption and a comment
+   are both just "text under the group key") and reused for comments too.
+   `apps/mobile`'s former template "Home" tab is now the "Today" screen
+   (`src/app/index.tsx`): for each unlocked group, decrypts and shows the
+   current selection, a "Seen by ..." line, a save/download button
+   (encouraged per [`DECISIONS.md`](DECISIONS.md#savingscreenshotting-the-photo-is-encouraged-not-discouraged),
+   plain browser download on this web build), and a decrypted comment
+   thread with a post box. Verified end-to-end in a real browser against
+   the real dev API/R2/Neon: real signup, group creation, and two photos
+   (one with a caption) encrypted and uploaded via the real crypto library
+   and confirmed through the real API; a real rotation sweep selected one;
+   the Today screen fetched, decrypted, and rendered it correctly (pixel-
+   checked, not just "didn't crash"); a comment was typed, posted,
+   decrypted, and persisted correctly across a full reload; and the view
+   was recorded and reflected in "Seen by" on reload. One genuine bug
+   caught and fixed along the way (not part of this step's own code, but
+   surfaced while relying on it): the step-5 purge scheduling only ever
+   set a selection's `purge_after` from *its own* `starts_at`, so it
+   purged itself hours into its own day instead of 12h after the *next*
+   rotation as documented — see
+   [`DECISIONS.md`](DECISIONS.md#purge-deletes-the-photos-row-entirely)'s
+   neighboring entries and `apps/api/src/rotation.ts` for the fix.
 7. **Polish pass** — reactions, member-removal key rotation, notifications-
    lite (in-app, no push yet since native isn't built).
 8. **Deploy** — staging + prod environments (Neon branch, Worker, R2

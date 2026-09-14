@@ -64,7 +64,7 @@ daily_selections(id, group_id, photo_id, local_date, starts_at,
                   expires_at, purge_after)                     -- UNIQUE(group_id, local_date); purge_after starts as a ~24h fallback,
                                                                  -- then gets moved up to (next rotation's starts_at + 12h) once there is one
 
-comments(id, selection_id, user_id, body, created_at)          -- body is ciphertext; FK cascade on selection delete
+comments(id, selection_id, user_id, body, nonce, created_at)   -- body is ciphertext, own AEAD nonce; FK cascade on selection delete
 
 views(selection_id, user_id, viewed_at)                        -- "who has seen today's photo"
 

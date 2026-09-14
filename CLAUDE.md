@@ -10,29 +10,32 @@ once a day a photo is randomly selected for the group to view and comment
 on; when the next one is selected, the previous photo and its comments are
 hard-deleted everywhere.
 
-**Current status: auth + identity keys + group creation/join/key-exchange +
-encrypted photo upload + rotation/purge all work end-to-end; there's no
-UI yet for viewing today's photo or commenting.** `apps/api` is a Hono app
-with `/v1/health`, Better Auth at `/v1/auth` (CORS + `trustedOrigins`
-scoped to `WEB_ORIGIN`), `/v1/groups` routes
-(`apps/api/src/routes/groups.ts`) for create/join/pending-members/admit,
-`/v1/groups/:id/photos` routes (`apps/api/src/routes/photos.ts`) for
-presigned-upload/confirm/list backed by R2, and an hourly Cron Trigger
-(`apps/api/src/rotation.ts`) that selects each due group's next photo and
-hard-purges the previous one (blob + row + selection, cascading to
-comments/views/reactions) — the timezone/hour math behind it is
-framework-free and tested in `packages/core/src/rotation.ts`. `apps/mobile` has
-functional (not polished) sign-up/sign-in/unlock
-(`src/components/auth-gate.tsx`) and a Groups tab (repurposed from the
-Expo template's Explore tab, `src/app/explore.tsx`) for creating/joining
-groups (new members silently auto-admitted by any online key-holding
-member's client — see
+**Current status: auth, groups/key-exchange, photo upload, rotation/purge,
+and the today's-photo screen (with comments + view tracking) all work
+end-to-end. Not built yet: reactions, member-removal key rotation,
+notifications, and deploy (staging/prod).** `apps/api` is a Hono app with
+`/v1/health`, Better Auth at `/v1/auth` (CORS + `trustedOrigins` scoped to
+`WEB_ORIGIN`), `/v1/groups` routes (`apps/api/src/routes/groups.ts`) for
+create/join/pending-members/admit, `/v1/groups/:id/photos` routes
+(`apps/api/src/routes/photos.ts`) for presigned-upload/confirm/list backed
+by R2, `/v1/groups/:id/today...` routes (`apps/api/src/routes/selection.ts`)
+for today's selection + comments + view tracking, and an hourly Cron
+Trigger (`apps/api/src/rotation.ts`) that selects each due group's next
+photo and hard-purges the previous one (blob + row + selection, cascading
+to comments/views/reactions) — the timezone/hour math behind it is
+framework-free and tested in `packages/core/src/rotation.ts`. `apps/mobile`
+has functional (not polished) sign-up/sign-in/unlock
+(`src/components/auth-gate.tsx`), a Groups tab (repurposed from the Expo
+template's Explore tab, `src/app/explore.tsx`) for creating/joining groups
+(new members silently auto-admitted by any online key-holding member's
+client — see
 [`docs/DECISIONS.md`](docs/DECISIONS.md#new-members-are-admitted-to-a-group-silently-not-via-an-approval-prompt))
-and for picking, downsizing/EXIF-stripping, encrypting, and uploading a
-photo, plus listing/decrypting the group's pool as thumbnails
-(`src/lib/photo-pipeline.ts`, `src/lib/photos-client.ts`). Crypto lives in
-`packages/core/src/` (`identity.ts`, `group-key.ts`, `invite-code.ts`,
-`photo.ts`), tested, and was also verified against the real API, Neon
+and picking/encrypting/uploading photos, plus a Today tab (the former
+template "Home" tab, `src/app/index.tsx`) that decrypts and shows each
+group's current selection, its comment thread, and a save/download
+action. Crypto lives in `packages/core/src/` (`identity.ts`,
+`group-key.ts`, `invite-code.ts`, `encryption.ts`, `photo.ts`,
+`rotation.ts`), tested, and was also verified against the real API, Neon
 database, and a live R2 bucket — not just single-user browser clicking.
 Still verify against the actual repo state before assuming specifics —
 this file is a summary, not a substitute for reading the code.
@@ -78,6 +81,12 @@ get a working app shipped. This changes how to work here, beyond the usual
 
 ## Working conventions
 
+- **Never run `git commit` unless the user explicitly asks for a commit in
+  that specific instance.** Finishing a task (even a whole roadmap step)
+  is not by itself permission to commit it — an earlier "commit then do
+  X" does not carry forward to the next piece of work. Leave changes
+  uncommitted and say so; let the user decide when to commit. The same
+  goes for `git push`.
 - Prefer editing/creating docs in `docs/` over reintroducing the same
   planning discussion in chat — if a decision changes, update
   `docs/DECISIONS.md` rather than letting the reasoning live only in
