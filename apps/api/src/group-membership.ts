@@ -1,5 +1,5 @@
 import { HTTPException } from "hono/http-exception";
-import { and, createDb, eq, groupKeys } from "@memaday/db";
+import { and, createDb, eq, groupKeys, groupMembers } from "@memaday/db";
 
 // A member is only trusted to act on a group's key material (see keys and
 // pending-members in routes/groups.ts) or to upload photos (routes/photos.ts)
@@ -18,5 +18,24 @@ export async function assertHoldsGroupKey(
     throw new HTTPException(403, {
       message: "Not a key-holding member of this group",
     });
+  }
+}
+
+// Removing a member is destructive and triggers a key rotation for
+// everyone else (see docs/DECISIONS.md's member-removal entry) — a higher
+// bar than the "any key-holding member can admit" rule above, so this is
+// admin-only. Today every group has exactly one admin (its creator — no
+// promote-to-admin flow exists yet), but the check is written generally
+// rather than special-cased to "is the creator."
+export async function assertIsAdmin(
+  db: ReturnType<typeof createDb>,
+  groupId: string,
+  userId: string,
+) {
+  const membership = await db.query.groupMembers.findFirst({
+    where: and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)),
+  });
+  if (!membership || membership.role !== "admin") {
+    throw new HTTPException(403, { message: "Admins only" });
   }
 }

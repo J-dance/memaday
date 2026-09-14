@@ -14,11 +14,19 @@ export interface GroupSummary {
   /** This user's wrapped copy of the group key — null until an existing
    * member's client notices and admits them (docs/ENCRYPTION.md#3-adding-a-member). */
   wrappedKey: string | null;
+  /** The caller's own role in this group. */
+  role: 'admin' | 'member';
 }
 
 export interface PendingMember {
   userId: string;
   publicKey: string;
+}
+
+export interface GroupMember {
+  userId: string;
+  displayName: string;
+  role: 'admin' | 'member';
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -63,5 +71,18 @@ export function submitGroupKey(groupId: string, userId: string, wrappedKey: stri
   return request(`/${groupId}/keys`, {
     method: 'POST',
     body: JSON.stringify({ userId, wrappedKey }),
+  });
+}
+
+export function listMembers(groupId: string): Promise<GroupMember[]> {
+  return request(`/${groupId}/members`);
+}
+
+/** Admin-only: removes `userId` from the group. Deliberately doesn't
+ * rotate the group key — see docs/DECISIONS.md's member-removal entry. */
+export function removeMember(groupId: string, userId: string): Promise<void> {
+  return request(`/${groupId}/remove-member`, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
   });
 }

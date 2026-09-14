@@ -596,3 +596,51 @@ clients to defend against, same trust model as everything else here.
 (`REACTION_EMOJIS`) is a UI choice, not a schema or server restriction —
 `reactions.emoji` has no allowed-values check, so a bigger set or a full
 picker later is a client-only change.
+
+---
+
+### Member removal doesn't rotate the group key
+
+**Decision:** Removing a member (`POST /v1/groups/:id/remove-member`,
+admin-only) deletes their `group_members` and `group_keys` rows and does
+nothing else — no new group key is generated, and no existing content is
+touched.
+
+**Why:** `ENCRYPTION.md`'s original sketch called for key rotation on
+removal (forward secrecy: a removed member shouldn't be able to decrypt
+anything uploaded after they're gone). Building it surfaced a real
+question, raised and settled in conversation: does rotation actually add
+protection *in this app's specific architecture*? Every way to obtain
+ciphertext — R2 downloads, presigned URLs — goes through an API route that
+already checks live group membership (`assertHoldsGroupKey`, which checks
+`group_keys` — gone the instant this route deletes it). A removed member
+has no channel left to receive anything new, regardless of whether they
+still remember the old key; the key becoming "wrong" for future content
+is redundant with access control that's already doing the real work.
+
+Meanwhile rotation's cost turned out to be real: nothing in this app can
+re-encrypt existing content (the server never sees plaintext, by design),
+so rotating the key would have permanently broken decryption of the
+group's current selection and its entire not-yet-selected upload pool —
+for every *remaining* member too, not just the removed one, since a group
+only ever holds one live key. Making that safe would have meant either
+purging all of it immediately (a much bigger, more surprising blast
+radius for "remove one member" than seems justified) or building real
+key-versioning (tracking which key epoch encrypted which content) — a
+chunk of complexity with no concrete threat it defends against here.
+
+**Trade-off accepted:** this is defense only via access control, not
+defense-in-depth via cryptography — if a future bug ever let a
+non-member's request through the membership check, they'd still hold a
+key that works. Worth revisiting if that concrete risk ever materializes
+(e.g. before this app's access model changes to serve ciphertext through
+any path that *doesn't* re-check membership per request).
+
+**Scope note:** this is "an admin kicks someone else." Self-removal
+("leave a group") is a deliberately different flow — not built yet — since
+whoever performs a removal action needs to still be around to hold
+whatever state results; that doesn't work for someone removing themselves.
+Also: today every group has exactly one admin (its creator; no
+promote-to-admin flow exists), so the "can't remove the last admin" guard
+in the route can't actually be triggered through the UI yet — kept anyway
+so it's correct the moment admin promotion exists.

@@ -10,11 +10,12 @@ import {
   groups,
   isNull,
   photos,
+  sql,
   users,
 } from "@memaday/db";
 import { generateInviteCode } from "@memaday/core";
 import { requireUser } from "../session.js";
-import { assertHoldsGroupKey } from "../group-membership.js";
+import { assertHoldsGroupKey, assertIsAdmin } from "../group-membership.js";
 import { presignPhotoDownload } from "../r2.js";
 import type { Bindings } from "../bindings.js";
 
@@ -120,6 +121,10 @@ groupsRoute.get("/", async (c) => {
       rotationHour: groups.rotationHour,
       inviteCode: groups.inviteCode,
       wrappedKey: groupKeys.wrappedKey,
+      // The caller's own role — lets the client decide whether to show
+      // admin-only controls (currently just member removal) without a
+      // separate request.
+      role: groupMembers.role,
     })
     .from(groupMembers)
     .innerJoin(groups, eq(groups.id, groupMembers.groupId))
@@ -243,6 +248,80 @@ groupsRoute.post("/:groupId/keys", async (c) => {
     .insert(groupKeys)
     .values({ groupId, userId, wrappedKey })
     .onConflictDoNothing();
+
+  return c.body(null, 204);
+});
+
+// The group's full member roster — any key-holding member can see who's
+// in the group (unlike removal itself, which is admin-only below).
+groupsRoute.get("/:groupId/members", async (c) => {
+  const user = await requireUser(c);
+  const groupId = c.req.param("groupId");
+  const db = createDb(c.env.DATABASE_URL);
+
+  await assertHoldsGroupKey(db, groupId, user.id);
+
+  const members = await db
+    .select({ userId: users.id, displayName: users.displayName, role: groupMembers.role })
+    .from(groupMembers)
+    .innerJoin(users, eq(users.id, groupMembers.userId))
+    .where(eq(groupMembers.groupId, groupId))
+    .orderBy(asc(groupMembers.joinedAt));
+
+  return c.json(members);
+});
+
+// Kicks another member out — admin-only, and deliberately does *not*
+// rotate the group key. See docs/DECISIONS.md's member-removal entry for
+// why: every way to fetch ciphertext (R2 downloads, presigned URLs) goes
+// through a route that already checks live group membership, so a removed
+// member (group_members + group_keys rows both gone) has no channel left
+// to receive anything new regardless of whether they still remember the
+// old key. Rotating anyway would only have added cost — it can't be done
+// without breaking every remaining member's access to already-encrypted
+// content too, since the server never has plaintext to re-encrypt with a
+// new key.
+groupsRoute.post("/:groupId/remove-member", async (c) => {
+  const user = await requireUser(c);
+  const groupId = c.req.param("groupId");
+  const { userId: targetUserId } = await c.req.json<{ userId: string }>();
+  if (!targetUserId) {
+    throw new HTTPException(400, { message: "userId is required" });
+  }
+  if (targetUserId === user.id) {
+    throw new HTTPException(400, {
+      message: "Can't remove yourself this way — leaving a group isn't built yet",
+    });
+  }
+
+  const db = createDb(c.env.DATABASE_URL);
+  await assertIsAdmin(db, groupId, user.id);
+
+  const target = await db.query.groupMembers.findFirst({
+    where: and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, targetUserId)),
+  });
+  if (!target) {
+    throw new HTTPException(404, { message: "Not a member of this group" });
+  }
+
+  if (target.role === "admin") {
+    const adminCountRows = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(groupMembers)
+      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.role, "admin")));
+    if ((adminCountRows[0]?.count ?? 0) <= 1) {
+      throw new HTTPException(409, { message: "Can't remove the last admin" });
+    }
+  }
+
+  await db.batch([
+    db
+      .delete(groupMembers)
+      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, targetUserId))),
+    db
+      .delete(groupKeys)
+      .where(and(eq(groupKeys.groupId, groupId), eq(groupKeys.userId, targetUserId))),
+  ]);
 
   return c.body(null, 204);
 });

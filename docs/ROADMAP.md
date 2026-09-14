@@ -116,7 +116,7 @@ repo state before assuming a step is fully done, this list can drift.
    rotation as documented — see
    [`DECISIONS.md`](DECISIONS.md#purge-deletes-the-photos-row-entirely)'s
    neighboring entries and `apps/api/src/rotation.ts` for the fix.
-7. **Polish pass (in progress)** — reactions, member-removal key rotation,
+7. **Polish pass (in progress)** — reactions, member removal,
    notifications-lite (in-app, no push yet since native isn't built).
    - **✅ Reactions.** `apps/api/src/routes/selection.ts` gained
      `POST/DELETE .../today/reactions`, and `GET .../today` now embeds the
@@ -133,7 +133,24 @@ repo state before assuming a step is fully done, this list can drift.
      deleted it, confirmed the list went back to empty, and confirmed
      deleting an already-deleted reaction 404s (ownership/existence check
      working).
-   - Member-removal key rotation and notifications-lite: not started.
+   - **✅ Member removal** (no key rotation — the roadmap originally said
+     "member-removal key rotation," but that turned out to be the wrong
+     call once actually designed; see
+     [`DECISIONS.md`](DECISIONS.md#member-removal-doesnt-rotate-the-group-key)).
+     `POST /v1/groups/:id/remove-member` (admin-only, new `assertIsAdmin`
+     in `apps/api/src/group-membership.ts`) deletes the target's
+     membership and key; a "can't remove the last admin" guard exists but
+     can't be triggered yet (no promote-to-admin flow). Scoped to "admin
+     kicks someone else" — self-removal/leaving isn't built.
+     `apps/mobile`'s Groups tab shows the roster (`GET .../members`,
+     `role` now included on `GET /groups`) with a Remove action for
+     admins. Verified against the real API with three isolated test
+     accounts: full roster with correct roles, non-admin removal attempt
+     403s, self-removal 400s, removing a non-member 404s, a real removal
+     succeeds and the target's own group list and every group route
+     correctly excludes/403s them afterward, and the admin's own key is
+     confirmed untouched.
+   - Notifications-lite: not started.
 8. **Deploy** — staging + prod environments (Neon branch, Worker, R2
    bucket, secrets — one full set per environment, see
    [`ARCHITECTURE.md`](ARCHITECTURE.md#environments)), wired to CI: push to

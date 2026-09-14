@@ -153,19 +153,34 @@ were designed, and `caption` was added later without revisiting it) — see
   Acceptable for a friends-only app; would be a real blocker if this ever
   opened up to less-trusted groups (see [`SCALING.md`](SCALING.md)).
 
-## A nice side effect of the ephemeral design
+## Member removal: access control does the work, not key rotation
 
-Removing a member normally requires **key rotation with forward secrecy**:
-generate a new group key, re-wrap it for remaining members, and — in a
-system with permanent history — re-encrypt everything the removed member
-could previously decrypt, or accept they can still decrypt old data forever.
+Removing a member is normally paired with **key rotation with forward
+secrecy**: generate a new group key, re-wrap it for remaining members, so
+the removed member can't decrypt anything from that point on. This app
+deliberately does *not* do that — see
+[`DECISIONS.md`](DECISIONS.md#member-removal-doesnt-rotate-the-group-key)
+for the full reasoning, worth reading since it reverses what an earlier
+draft of this doc said. The short version:
 
-Because nothing in this app lives longer than 12 hours, we get the
-forward-secrecy property almost for free: on member removal, generate a new
-group key and wrap it only for remaining members; *new* photos/comments use
-the new key. The removed member can still technically decrypt whatever was
-already visible to them before removal — but that's gone within 12 hours
-regardless, so there's no permanent-history re-encryption problem to solve.
+Rotation defends against a removed member who somehow still has a way to
+*fetch* new ciphertext despite being removed. In this app, they don't —
+every path to ciphertext (R2 downloads, presigned URLs) goes through an
+API route that checks live group membership first (`assertHoldsGroupKey`),
+and removal deletes exactly the rows that check looks at. A removed member
+can't get anything new to decrypt, so a key they can no longer use for
+anything doesn't add protection.
+
+It was tempting to rotate anyway "for defense in depth," but building it
+surfaced a real cost worth naming: this app has no way to re-encrypt
+existing content (the server never sees plaintext), and a group's upload
+pool isn't time-bounded the way a shown selection is — a photo can sit
+unselected for a long time. Rotating the key would have permanently broken
+decryption of that pool (and the current selection, if mid-day) for every
+*remaining* member too, not just the one being removed, since a group only
+ever holds one live key at a time. That's a much bigger, more surprising
+blast radius than "remove one member" implies, for a property (defense
+against a hypothetical access-control bug) this app doesn't currently need.
 
 ## Platform note: this works on web today, needs revisiting for native
 

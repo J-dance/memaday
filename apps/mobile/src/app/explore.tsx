@@ -13,8 +13,11 @@ import {
   createGroup,
   joinGroup,
   listGroups,
+  listMembers,
   listPendingMembers,
+  removeMember,
   submitGroupKey,
+  type GroupMember,
   type GroupSummary,
 } from '@/lib/groups-client';
 import { fetchAndDecryptGroupPhotos, pickAndUploadPhoto, type DecryptedPhoto } from '@/lib/photo-pipeline';
@@ -55,6 +58,10 @@ export default function GroupsScreen() {
       for (const group of fetched) {
         if (!group.wrappedKey) continue;
 
+        // Once set, a member's wrapped key never changes for the life of
+        // the group (member removal doesn't rotate it — see
+        // docs/DECISIONS.md), so it's safe to keep whatever's already
+        // cached rather than re-unwrapping on every refresh.
         let groupKey = getGroupKey(group.id);
         if (!groupKey) {
           groupKey = await unwrapGroupKey(group.wrappedKey, session.user.publicKey, privateKey);
@@ -96,7 +103,12 @@ export default function GroupsScreen() {
               </ThemedText>
             )}
             {groups.map((group) => (
-              <GroupRow key={group.id} group={group} groupKey={getGroupKey(group.id)} />
+              <GroupRow
+                key={group.id}
+                group={group}
+                groupKey={getGroupKey(group.id)}
+                currentUserId={session?.user.id}
+              />
             ))}
           </ThemedView>
         )}
@@ -124,9 +136,19 @@ export default function GroupsScreen() {
   );
 }
 
-function GroupRow({ group, groupKey }: { group: GroupSummary; groupKey: Uint8Array | undefined }) {
+function GroupRow({
+  group,
+  groupKey,
+  currentUserId,
+}: {
+  group: GroupSummary;
+  groupKey: Uint8Array | undefined;
+  currentUserId: string | undefined;
+}) {
   const [photos, setPhotos] = useState<DecryptedPhoto[] | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [members, setMembers] = useState<GroupMember[] | null>(null);
+  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refreshPhotos = useCallback(async () => {
@@ -138,9 +160,19 @@ function GroupRow({ group, groupKey }: { group: GroupSummary; groupKey: Uint8Arr
     }
   }, [group.id, groupKey]);
 
+  const refreshMembers = useCallback(async () => {
+    if (!groupKey) return;
+    try {
+      setMembers(await listMembers(group.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load members');
+    }
+  }, [group.id, groupKey]);
+
   useEffect(() => {
     refreshPhotos();
-  }, [refreshPhotos]);
+    refreshMembers();
+  }, [refreshPhotos, refreshMembers]);
 
   async function handleUpload() {
     if (!groupKey) return;
@@ -153,6 +185,21 @@ function GroupRow({ group, groupKey }: { group: GroupSummary; groupKey: Uint8Arr
       setError(err instanceof Error ? err.message : 'Could not upload photo');
     } finally {
       setUploading(false);
+    }
+  }
+
+  // Doesn't rotate the group key — see docs/DECISIONS.md's member-removal
+  // entry for why removing membership access alone is enough here.
+  async function handleRemove(userId: string) {
+    setRemovingUserId(userId);
+    setError(null);
+    try {
+      await removeMember(group.id, userId);
+      await refreshMembers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not remove member');
+    } finally {
+      setRemovingUserId(null);
     }
   }
 
@@ -190,6 +237,37 @@ function GroupRow({ group, groupKey }: { group: GroupSummary; groupKey: Uint8Arr
                 <Image key={photo.id} source={{ uri: photo.dataUri }} style={styles.thumbnail} />
               ))}
             </ScrollView>
+          )}
+
+          {members && (
+            <ThemedView style={styles.members}>
+              {members.map((member) => {
+                const isSelf = member.userId === currentUserId;
+                const iAmAdmin = members.find((m) => m.userId === currentUserId)?.role === 'admin';
+                return (
+                  <ThemedView key={member.userId} style={styles.memberRow}>
+                    <ThemedText type="small">
+                      {member.displayName}
+                      {member.role === 'admin' ? ' (admin)' : ''}
+                      {isSelf ? ' (you)' : ''}
+                    </ThemedText>
+                    {iAmAdmin && !isSelf && (
+                      <Pressable
+                        onPress={() => handleRemove(member.userId)}
+                        disabled={removingUserId === member.userId}>
+                        {removingUserId === member.userId ? (
+                          <ActivityIndicator />
+                        ) : (
+                          <ThemedText type="link" themeColor="textSecondary">
+                            Remove
+                          </ThemedText>
+                        )}
+                      </Pressable>
+                    )}
+                  </ThemedView>
+                );
+              })}
+            </ThemedView>
           )}
         </>
       )}
@@ -331,6 +409,14 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: Spacing.one,
     marginRight: Spacing.one,
+  },
+  members: {
+    gap: Spacing.one,
+  },
+  memberRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   form: {
     alignSelf: 'stretch',
