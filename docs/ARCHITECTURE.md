@@ -57,7 +57,7 @@ group_members(group_id, user_id, role, joined_at)              -- composite PK
 group_keys(group_id, user_id, wrapped_key)                     -- see ENCRYPTION.md
 
 photos(id, group_id, uploader_id, storage_key, width, height,
-       nonce, caption, caption_nonce, state: pending|ready|shown|purged,
+       nonce, caption, caption_nonce, state: pending|ready|shown,
        created_at)
 
 daily_selections(id, group_id, photo_id, local_date, starts_at,
@@ -82,8 +82,11 @@ Notes:
 - Rotation is a **group-level** event on the group's own timezone +
   rotation hour, not a single global midnight — a group spread across
   timezones still sees the same photo at the same time.
-- `photos.state` only ever moves forward (`pending → ready → shown →
-  purged`) — a photo can be selected once, ever. No path back to `ready`.
+- `photos.state` only ever moves forward (`pending → ready → shown`) — a
+  photo can be selected once, ever. No path back to `ready`, and no
+  `purged` state either: a purged photo's row is deleted outright rather
+  than transitioned to a terminal state (see
+  [`DECISIONS.md`](DECISIONS.md#purge-deletes-the-photos-row-entirely)).
 - The previous day's selection is hard-purged (blob + rows) 12 hours after
   the new one starts, via the same hourly cron sweep.
 - If a group has no eligible (unshown) photos at rotation time, no

@@ -44,4 +44,12 @@
       "remote": true,
     },
   ],
+  // Drives the rotation + purge sweep (src/rotation.ts's `scheduled`
+  // export) — see docs/DECISIONS.md's "Rotation and deletion are
+  // cron-driven" entry. `wrangler dev` doesn't fire this on its own; test
+  // it locally by hitting `/__scheduled` (wrangler's dev-only trigger
+  // endpoint) or by calling runScheduled directly.
+  "triggers": {
+    "crons": ["0 * * * *"],
+  },
 }

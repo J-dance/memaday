@@ -26,11 +26,14 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+// No "purged" state — a purged photo's row is hard-deleted outright (see
+// docs/DECISIONS.md's "Purge deletes the photos row entirely" entry)
+// rather than transitioning to a terminal state, so there's nothing for a
+// fourth enum value to ever record.
 export const photoStateEnum = pgEnum("photo_state", [
   "pending",
   "ready",
   "shown",
-  "purged",
 ]);
 
 export const groupRoleEnum = pgEnum("group_role", ["admin", "member"]);

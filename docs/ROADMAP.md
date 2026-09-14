@@ -56,11 +56,33 @@ repo state before assuming a step is fully done, this list can drift.
    PUT/GET — see
    [`DECISIONS.md`](DECISIONS.md#r2-bucket-needs-an-explicit-cors-policy-for-browser-uploadsdownloads)
    (staging/prod will each need their own).
-5. **Rotation engine + purge job** — cron trigger, group-timezone-aware "is
-   this group due" check, random selection excluding already-shown photos,
-   idempotent write via the `UNIQUE(group_id, local_date)` constraint,
-   empty-pool nudge-to-upload path, and the purge job that deletes the
-   previous selection's blob + rows.
+5. **✅ Rotation engine + purge job** — an hourly Cloudflare Cron Trigger
+   (`apps/api/wrangler.jsonc` `triggers.crons`) runs `runScheduled`
+   (`apps/api/src/rotation.ts`), which wraps the timezone/hour math in
+   `packages/core/src/rotation.ts` (`checkRotationDue`,
+   `computePurgeAfter`, `computeExpiresAt` — pure and unit-tested,
+   including DST/UTC-day-boundary cases). Each due group gets a random
+   `ready` photo (`ORDER BY random() LIMIT 1`) written via
+   `db.batch()`, idempotent through the `UNIQUE(group_id, local_date)`
+   constraint (checked explicitly before picking a photo, not just relied
+   on via conflict, so a redundant hourly run doesn't burn a photo's
+   one-shot "ready → shown" transition). A due group with no eligible
+   photos gets no selection recorded — that absence is the empty-pool
+   nudge, since the today's-photo screen (step 6) will have nothing to
+   show. The purge sweep hard-deletes the R2 blob, the `photos` row, and
+   the `daily_selections` row (which cascades to comments/views/reactions)
+   for anything past `purge_after` — see
+   [`DECISIONS.md`](DECISIONS.md#purge-deletes-the-photos-row-entirely)
+   for why the row is deleted outright rather than kept as a `purged`
+   tombstone. Verified against the real Neon database and a real Workers
+   runtime (`wrangler dev --test-scheduled`, real R2 binding): seeded a
+   due group with two ready photos, a due group with an empty pool, a
+   not-due group, and a past-`purge_after` selection with a comment —
+   after one sweep, the due group got exactly one new selection (other
+   photo left `ready`), the empty-pool group got nothing, the not-due
+   group was untouched, and the old selection's photo row, selection row,
+   and comment were all gone. A second sweep changed nothing (idempotency
+   confirmed).
 6. **Today's-photo screen + comments** — the main daily view, decrypt +
    display, encrypted comment thread, view tracking ("who's seen today's
    photo"), and an explicit save/download action — saving the photo is

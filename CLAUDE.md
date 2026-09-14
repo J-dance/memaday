@@ -11,12 +11,17 @@ on; when the next one is selected, the previous photo and its comments are
 hard-deleted everywhere.
 
 **Current status: auth + identity keys + group creation/join/key-exchange +
-encrypted photo upload work end-to-end; rotation and purge aren't built
-yet.** `apps/api` is a Hono app with `/v1/health`, Better Auth at
-`/v1/auth` (CORS + `trustedOrigins` scoped to `WEB_ORIGIN`), `/v1/groups`
-routes (`apps/api/src/routes/groups.ts`) for create/join/pending-members/
-admit, and `/v1/groups/:id/photos` routes (`apps/api/src/routes/photos.ts`)
-for presigned-upload/confirm/list, backed by R2. `apps/mobile` has
+encrypted photo upload + rotation/purge all work end-to-end; there's no
+UI yet for viewing today's photo or commenting.** `apps/api` is a Hono app
+with `/v1/health`, Better Auth at `/v1/auth` (CORS + `trustedOrigins`
+scoped to `WEB_ORIGIN`), `/v1/groups` routes
+(`apps/api/src/routes/groups.ts`) for create/join/pending-members/admit,
+`/v1/groups/:id/photos` routes (`apps/api/src/routes/photos.ts`) for
+presigned-upload/confirm/list backed by R2, and an hourly Cron Trigger
+(`apps/api/src/rotation.ts`) that selects each due group's next photo and
+hard-purges the previous one (blob + row + selection, cascading to
+comments/views/reactions) — the timezone/hour math behind it is
+framework-free and tested in `packages/core/src/rotation.ts`. `apps/mobile` has
 functional (not polished) sign-up/sign-in/unlock
 (`src/components/auth-gate.tsx`) and a Groups tab (repurposed from the
 Expo template's Explore tab, `src/app/explore.tsx`) for creating/joining

@@ -15,6 +15,13 @@
       "when": 1789302879903,
       "tag": "0001_soft_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789392530336,
+      "tag": "0002_breezy_tusk",
+      "breakpoints": true
     }
   ]
 }

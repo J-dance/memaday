@@ -11,7 +11,7 @@ export * from "./schema.js";
 // types as structurally incompatible — every `eq(...)`/`and(...)` call
 // fails to typecheck across the package boundary. Importing everything
 // through this one instance avoids that entirely.
-export { and, asc, desc, eq, isNull, isNotNull, ne, or, sql } from "drizzle-orm";
+export { and, asc, desc, eq, isNull, isNotNull, lte, ne, or, sql } from "drizzle-orm";
 
 // Neon's HTTP driver, not a raw TCP `pg` connection: Cloudflare Workers
 // can't hold a pooled TCP socket open the way a long-running Node server

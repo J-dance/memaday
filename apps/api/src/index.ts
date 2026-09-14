@@ -4,6 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import { createAuth } from "./auth.js";
 import { groupsRoute } from "./routes/groups.js";
 import { photosRoute } from "./routes/photos.js";
+import { runScheduled } from "./rotation.js";
 import type { Bindings } from "./bindings.js";
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -54,4 +55,13 @@ v1.on(["GET", "POST"], "/auth/*", (c) => {
 v1.route("/groups", groupsRoute);
 v1.route("/photos", photosRoute);
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // The Cloudflare Cron Trigger declared in wrangler.jsonc (`triggers.crons`)
+  // invokes this hourly — see docs/DECISIONS.md's "Rotation and deletion
+  // are cron-driven" entry for why this isn't just a route someone has to
+  // remember to hit.
+  scheduled: async (_controller, env) => {
+    await runScheduled(env);
+  },
+} satisfies ExportedHandler<Bindings>;
