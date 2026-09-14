@@ -2,6 +2,7 @@ import {
   and,
   createDb,
   dailySelections,
+  desc,
   eq,
   groups,
   lte,
@@ -53,6 +54,20 @@ export async function runRotationSweep(env: Bindings, now = new Date()) {
     // upload instead, no separate notification plumbing needed yet.
     if (!candidate) continue;
 
+    // The group's currently-live selection (yesterday's, ordinarily), if
+    // any — found *before* inserting today's row so this can't just find
+    // itself. Its purge_after gets moved up to "12h after today's
+    // selection" below, per docs/DECISIONS.md's "Purge delay: 12 hours
+    // after the next rotation" entry: a selection is purged 12h after the
+    // *next* one starts, not 12h into its own day. Left alone, it would
+    // still have the ~24h fallback purge_after it was inserted with
+    // (see below) — hours too early, and with no overlap for someone
+    // mid-comment at the exact rotation moment.
+    const previous = await db.query.dailySelections.findFirst({
+      where: eq(dailySelections.groupId, group.id),
+      orderBy: desc(dailySelections.startsAt),
+    });
+
     const startsAt = now;
     await db.batch([
       db
@@ -63,11 +78,24 @@ export async function runRotationSweep(env: Bindings, now = new Date()) {
           localDate,
           startsAt,
           expiresAt: computeExpiresAt(startsAt),
-          purgeAfter: computePurgeAfter(startsAt),
+          // Fallback only: this row has no successor yet to set its real
+          // purge_after (12h after whatever rotation eventually follows
+          // it). ~24h out matches the normal one-rotation-per-day cadence,
+          // so a group that stops rotating (e.g. empty pool) still purges
+          // on roughly the schedule a live one would have overwritten
+          // this with anyway.
+          purgeAfter: computeExpiresAt(startsAt),
         })
         .onConflictDoNothing(),
       db.update(photos).set({ state: "shown" }).where(eq(photos.id, candidate.id)),
     ]);
+
+    if (previous) {
+      await db
+        .update(dailySelections)
+        .set({ purgeAfter: computePurgeAfter(startsAt) })
+        .where(eq(dailySelections.id, previous.id));
+    }
   }
 }
 

@@ -61,7 +61,8 @@ photos(id, group_id, uploader_id, storage_key, width, height,
        created_at)
 
 daily_selections(id, group_id, photo_id, local_date, starts_at,
-                  expires_at, purge_after)                     -- UNIQUE(group_id, local_date); purge_after = starts_at + 12h
+                  expires_at, purge_after)                     -- UNIQUE(group_id, local_date); purge_after starts as a ~24h fallback,
+                                                                 -- then gets moved up to (next rotation's starts_at + 12h) once there is one
 
 comments(id, selection_id, user_id, body, created_at)          -- body is ciphertext; FK cascade on selection delete
 
