@@ -40,9 +40,22 @@ repo state before assuming a step is fully done, this list can drift.
    browser-clicking) — member B ends up with the exact same group key
    member A generated, and a non-member is correctly forbidden from the
    pending-members/keys routes.
-4. **Photo upload (encrypted)** — client-side downsize + EXIF strip +
-   encrypt, presigned R2 upload flow, `POST /photos/confirm` with nonce,
-   list + decrypt a group's photo pool.
+4. **✅ Photo upload (encrypted)** — client-side downsize + EXIF strip
+   (`expo-image-manipulator` re-encode) + encrypt with XChaCha20-Poly1305
+   under the group key (`packages/core/src/photo.ts`), presigned R2 upload
+   flow (`apps/api/src/routes/photos.ts`), `POST /v1/groups/:id/photos/confirm`
+   with separate nonces for the photo bytes and caption (two independent
+   ciphertexts need independent nonces — reusing one is a real AEAD
+   vulnerability, not just style), list + decrypt a group's photo pool.
+   `apps/mobile`'s Groups tab can pick, upload, and render the pool as
+   thumbnails (`src/lib/photo-pipeline.ts`, `src/lib/photos-client.ts`).
+   Verified in a real browser session against the live R2 bucket and Neon
+   database, end to end: pick → resize/strip EXIF → encrypt → presign → PUT
+   → confirm → list → decrypt → render. Also surfaced that presigned R2
+   URLs work from curl but need an explicit bucket CORS policy for browser
+   PUT/GET — see
+   [`DECISIONS.md`](DECISIONS.md#r2-bucket-needs-an-explicit-cors-policy-for-browser-uploadsdownloads)
+   (staging/prod will each need their own).
 5. **Rotation engine + purge job** — cron trigger, group-timezone-aware "is
    this group due" check, random selection excluding already-shown photos,
    idempotent write via the `UNIQUE(group_id, local_date)` constraint,

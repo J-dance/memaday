@@ -10,23 +10,27 @@ once a day a photo is randomly selected for the group to view and comment
 on; when the next one is selected, the previous photo and its comments are
 hard-deleted everywhere.
 
-**Current status: auth + identity keys + group creation/join/key-exchange
-work end-to-end; photo upload and rotation aren't built yet.** `apps/api`
-is a Hono app with `/v1/health`, Better Auth at `/v1/auth` (CORS +
-`trustedOrigins` scoped to `WEB_ORIGIN`), and `/v1/groups` routes
-(`apps/api/src/routes/groups.ts`) for create/join/pending-members/admit.
-`apps/mobile` has functional (not polished) sign-up/sign-in/unlock
+**Current status: auth + identity keys + group creation/join/key-exchange +
+encrypted photo upload work end-to-end; rotation and purge aren't built
+yet.** `apps/api` is a Hono app with `/v1/health`, Better Auth at
+`/v1/auth` (CORS + `trustedOrigins` scoped to `WEB_ORIGIN`), `/v1/groups`
+routes (`apps/api/src/routes/groups.ts`) for create/join/pending-members/
+admit, and `/v1/groups/:id/photos` routes (`apps/api/src/routes/photos.ts`)
+for presigned-upload/confirm/list, backed by R2. `apps/mobile` has
+functional (not polished) sign-up/sign-in/unlock
 (`src/components/auth-gate.tsx`) and a Groups tab (repurposed from the
 Expo template's Explore tab, `src/app/explore.tsx`) for creating/joining
-groups, with new members silently auto-admitted by any online key-holding
+groups (new members silently auto-admitted by any online key-holding
 member's client — see
-[`docs/DECISIONS.md`](docs/DECISIONS.md#new-members-are-admitted-to-a-group-silently-not-via-an-approval-prompt).
-Crypto (identity keypair + group-key wrapping) lives in `packages/core/src/`
-(`identity.ts`, `group-key.ts`, `invite-code.ts`), tested, and was also
-verified with a two-identity integration check against the real API and
-Neon database — not just single-user browser clicking. Still verify
-against the actual repo state before assuming specifics — this file is a
-summary, not a substitute for reading the code.
+[`docs/DECISIONS.md`](docs/DECISIONS.md#new-members-are-admitted-to-a-group-silently-not-via-an-approval-prompt))
+and for picking, downsizing/EXIF-stripping, encrypting, and uploading a
+photo, plus listing/decrypting the group's pool as thumbnails
+(`src/lib/photo-pipeline.ts`, `src/lib/photos-client.ts`). Crypto lives in
+`packages/core/src/` (`identity.ts`, `group-key.ts`, `invite-code.ts`,
+`photo.ts`), tested, and was also verified against the real API, Neon
+database, and a live R2 bucket — not just single-user browser clicking.
+Still verify against the actual repo state before assuming specifics —
+this file is a summary, not a substitute for reading the code.
 
 Read these before making architectural suggestions or writing code:
 
