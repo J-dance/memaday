@@ -562,3 +562,37 @@ would need a separate counter if it's ever wanted.
 `ON DELETE CASCADE` of its own, so the purge job deletes the
 `daily_selections` row *before* the `photos` row (in that order, inside
 one `db.batch()`) — see `apps/api/src/rotation.ts`.
+
+---
+
+### Reactions are E2E encrypted, so they need an id, not a composite key
+
+**Decision:** Reaction emojis are encrypted client-side (ciphertext +
+nonce, same as comments), and `reactions` gained its own `uuid` primary
+key (migration `0004`), replacing the original composite key on
+`(selection_id, user_id, emoji)`.
+
+**Why:** Confirmed by product owner when raised as a genuine fork — the
+alternative (leave the emoji plaintext, like `views`) would have let the
+server aggregate/see reaction sentiment; encrypting keeps that off the
+table too, consistent with `ENCRYPTION.md`'s "can't read content even in
+principle" goal. But encrypting the emoji broke the composite key: two
+encryptions of the same emoji never produce the same ciphertext bytes
+(fresh nonce every call, by design — see `packages/core/src/encryption.ts`),
+so the server can no longer tell "same reaction" from "different reaction"
+by comparing rows. An `id`-keyed table, shaped almost identically to
+`comments`, sidesteps this — the client (which already decrypts every
+reaction to render counts) is what decides whether a tap means "add a new
+one" or "delete this specific row I already know the id of," not
+something the server can determine from the ciphertext alone.
+
+**Implication:** the server can no longer prevent duplicate reactions
+(same user, same emoji, two rows) the way a composite key would have —
+that's now purely client-enforced (check the decrypted list before
+deciding to POST). Low-stakes for a friends-only app with no adversarial
+clients to defend against, same trust model as everything else here.
+
+**Emoji set:** the fixed 4-emoji palette in `apps/mobile/src/lib/today-pipeline.ts`
+(`REACTION_EMOJIS`) is a UI choice, not a schema or server restriction —
+`reactions.emoji` has no allowed-values check, so a bigger set or a full
+picker later is a client-only change.

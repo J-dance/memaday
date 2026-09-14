@@ -38,6 +38,14 @@ export interface GroupComment {
   createdAt: string;
 }
 
+export interface GroupReaction {
+  id: string;
+  userId: string;
+  /** Ciphertext, decrypted client-side with the group key. */
+  emoji: string;
+  nonce: string;
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     credentials: 'include',
@@ -57,7 +65,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 export function fetchToday(
   groupId: string,
-): Promise<{ selection: TodaySelection | null; views: Viewer[] }> {
+): Promise<{ selection: TodaySelection | null; views: Viewer[]; reactions: GroupReaction[] }> {
   return request(`${API_URL}/v1/groups/${groupId}/today`);
 }
 
@@ -76,5 +84,21 @@ export function postComment(
   return request(`${API_URL}/v1/groups/${groupId}/today/comments`, {
     method: 'POST',
     body: JSON.stringify(input),
+  });
+}
+
+export function postReaction(
+  groupId: string,
+  input: { emoji: string; nonce: string },
+): Promise<GroupReaction> {
+  return request(`${API_URL}/v1/groups/${groupId}/today/reactions`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteReaction(groupId: string, reactionId: string): Promise<void> {
+  return request(`${API_URL}/v1/groups/${groupId}/today/reactions/${reactionId}`, {
+    method: 'DELETE',
   });
 }

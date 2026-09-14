@@ -68,7 +68,7 @@ comments(id, selection_id, user_id, body, nonce, created_at)   -- body is cipher
 
 views(selection_id, user_id, viewed_at)                        -- "who has seen today's photo"
 
-reactions(selection_id, user_id, emoji)
+reactions(id, selection_id, user_id, emoji, nonce, created_at) -- emoji is ciphertext, own AEAD nonce; FK cascade on selection delete
 
 devices(user_id, expo_push_token, platform)                    -- added when native ships
 ```

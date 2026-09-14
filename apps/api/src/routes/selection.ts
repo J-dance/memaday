@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
+  and,
   asc,
   comments,
   createDb,
@@ -8,6 +9,7 @@ import {
   desc,
   eq,
   photos,
+  reactions,
   users,
   views,
   type Database,
@@ -72,6 +74,21 @@ selectionRoute.get("/:groupId/today", async (c) => {
     .innerJoin(users, eq(users.id, views.userId))
     .where(eq(views.selectionId, selection.id));
 
+  // Ciphertext, same as comments — the client decrypts to know both what
+  // each reaction is and whether it's the caller's own, to render counts
+  // and toggle state. See docs/DECISIONS.md's "Reactions are E2E
+  // encrypted" entry for why this has its own id rather than being keyed
+  // by (selection, user, emoji).
+  const reactionRows = await db
+    .select({
+      id: reactions.id,
+      userId: reactions.userId,
+      emoji: reactions.emoji,
+      nonce: reactions.nonce,
+    })
+    .from(reactions)
+    .where(eq(reactions.selectionId, selection.id));
+
   return c.json({
     selection: {
       id: selection.id,
@@ -89,6 +106,7 @@ selectionRoute.get("/:groupId/today", async (c) => {
       expiresInSeconds,
     },
     views: viewers,
+    reactions: reactionRows,
   });
 });
 
@@ -179,4 +197,56 @@ selectionRoute.post("/:groupId/today/comments", async (c) => {
     },
     201,
   );
+});
+
+// Adds one reaction row for the caller. No dedup here — the client already
+// has the full decrypted reaction list (from GET /today) and decides
+// itself whether this tap means "add" or "remove" (see DELETE below); the
+// server can't tell two encryptions of the same emoji apart to dedupe
+// even if it wanted to.
+selectionRoute.post("/:groupId/today/reactions", async (c) => {
+  const user = await requireUser(c);
+  const groupId = c.req.param("groupId");
+  const body = await c.req.json<{ emoji: string; nonce: string }>();
+  if (!body.emoji || !body.nonce) {
+    throw new HTTPException(400, { message: "emoji and nonce are required" });
+  }
+
+  const db = createDb(c.env.DATABASE_URL);
+  await assertHoldsGroupKey(db, groupId, user.id);
+
+  const selection = await getCurrentSelection(db, groupId);
+  if (!selection) {
+    throw new HTTPException(404, { message: "No current selection to react to" });
+  }
+
+  const id = crypto.randomUUID();
+  await db
+    .insert(reactions)
+    .values({ id, selectionId: selection.id, userId: user.id, emoji: body.emoji, nonce: body.nonce });
+
+  return c.json({ id, userId: user.id, emoji: body.emoji, nonce: body.nonce }, 201);
+});
+
+// Removes one of the caller's own reactions. Ownership is checked in the
+// WHERE clause (not just existence) — a reaction is only ever removable by
+// whoever posted it, same "no moderation" trust model as comments.
+selectionRoute.delete("/:groupId/today/reactions/:reactionId", async (c) => {
+  const user = await requireUser(c);
+  const groupId = c.req.param("groupId");
+  const reactionId = c.req.param("reactionId");
+  const db = createDb(c.env.DATABASE_URL);
+
+  await assertHoldsGroupKey(db, groupId, user.id);
+
+  const deleted = await db
+    .delete(reactions)
+    .where(and(eq(reactions.id, reactionId), eq(reactions.userId, user.id)))
+    .returning({ id: reactions.id });
+
+  if (deleted.length === 0) {
+    throw new HTTPException(404, { message: "Reaction not found" });
+  }
+
+  return c.body(null, 204);
 });

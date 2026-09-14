@@ -16,7 +16,10 @@ import {
   fetchAndDecryptComments,
   fetchAndDecryptToday,
   markTodayViewed,
+  REACTION_EMOJIS,
+  toggleReaction,
   type DecryptedComment,
+  type DecryptedReaction,
   type DecryptedSelection,
 } from '@/lib/today-pipeline';
 import { useGroupKeysSession } from '@/lib/group-keys-session';
@@ -72,7 +75,12 @@ export default function TodayScreen() {
           </ThemedText>
         ) : (
           unlockedGroups.map((group) => (
-            <TodaySection key={group.id} group={group} groupKey={getGroupKey(group.id)!} />
+            <TodaySection
+              key={group.id}
+              group={group}
+              groupKey={getGroupKey(group.id)!}
+              currentUserId={session?.user.id}
+            />
           ))
         )}
       </ScrollView>
@@ -80,10 +88,19 @@ export default function TodayScreen() {
   );
 }
 
-function TodaySection({ group, groupKey }: { group: GroupSummary; groupKey: Uint8Array }) {
+function TodaySection({
+  group,
+  groupKey,
+  currentUserId,
+}: {
+  group: GroupSummary;
+  groupKey: Uint8Array;
+  currentUserId: string | undefined;
+}) {
   // undefined = still loading; null = loaded, no selection today.
   const [selection, setSelection] = useState<DecryptedSelection | null | undefined>(undefined);
   const [viewers, setViewers] = useState<Viewer[]>([]);
+  const [reactions, setReactions] = useState<DecryptedReaction[]>([]);
   const [comments, setComments] = useState<DecryptedComment[] | null>(null);
   const [commentText, setCommentText] = useState('');
   const [posting, setPosting] = useState(false);
@@ -95,6 +112,7 @@ function TodaySection({ group, groupKey }: { group: GroupSummary; groupKey: Uint
       const today = await fetchAndDecryptToday(group.id, groupKey);
       setSelection(today.selection);
       setViewers(today.views);
+      setReactions(today.reactions);
 
       if (today.selection) {
         setComments(await fetchAndDecryptComments(group.id, groupKey));
@@ -110,6 +128,29 @@ function TodaySection({ group, groupKey }: { group: GroupSummary; groupKey: Uint
   useEffect(() => {
     load();
   }, [load]);
+
+  async function handleToggleReaction(emoji: string) {
+    if (!currentUserId) return;
+    setError(null);
+    // Optimistic: flip local state immediately, revert if the request fails
+    // — reacting should feel instant, not wait on a round trip.
+    const mine = reactions.find((r) => r.userId === currentUserId && r.emoji === emoji);
+    const optimisticId = `optimistic-${Date.now()}`;
+    setReactions((prev) =>
+      mine
+        ? prev.filter((r) => r.id !== mine.id)
+        : [...prev, { id: optimisticId, userId: currentUserId, emoji }],
+    );
+    try {
+      const result = await toggleReaction(group.id, emoji, currentUserId, reactions, groupKey);
+      if (result.type === 'added') {
+        setReactions((prev) => prev.map((r) => (r.id === optimisticId ? result.reaction : r)));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update reaction');
+      await load();
+    }
+  }
 
   async function handlePostComment() {
     const text = commentText.trim();
@@ -162,6 +203,24 @@ function TodaySection({ group, groupKey }: { group: GroupSummary; groupKey: Uint
               ? 'No one has seen this yet'
               : `Seen by ${viewers.map((viewer) => viewer.displayName).join(', ')}`}
           </ThemedText>
+
+          <ThemedView style={styles.reactionRow}>
+            {REACTION_EMOJIS.map((emoji) => {
+              const count = reactions.filter((r) => r.emoji === emoji).length;
+              const mine = reactions.some((r) => r.userId === currentUserId && r.emoji === emoji);
+              return (
+                <Pressable
+                  key={emoji}
+                  style={[styles.reactionChip, mine && styles.reactionChipMine]}
+                  onPress={() => handleToggleReaction(emoji)}>
+                  <ThemedText type="small">
+                    {emoji}
+                    {count > 0 ? ` ${count}` : ''}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </ThemedView>
 
           {Platform.OS === 'web' && (
             <Pressable style={styles.saveButton} onPress={handleSave}>
@@ -243,6 +302,20 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     aspectRatio: 1,
     borderRadius: Spacing.two,
+  },
+  reactionRow: {
+    flexDirection: 'row',
+    gap: Spacing.one,
+  },
+  reactionChip: {
+    borderWidth: 1,
+    borderColor: '#88888844',
+    borderRadius: Spacing.four,
+    paddingVertical: 2,
+    paddingHorizontal: Spacing.two,
+  },
+  reactionChipMine: {
+    borderColor: '#3c87f7',
   },
   saveButton: {
     backgroundColor: '#3c87f7',

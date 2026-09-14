@@ -116,8 +116,24 @@ repo state before assuming a step is fully done, this list can drift.
    rotation as documented — see
    [`DECISIONS.md`](DECISIONS.md#purge-deletes-the-photos-row-entirely)'s
    neighboring entries and `apps/api/src/rotation.ts` for the fix.
-7. **Polish pass** — reactions, member-removal key rotation, notifications-
-   lite (in-app, no push yet since native isn't built).
+7. **Polish pass (in progress)** — reactions, member-removal key rotation,
+   notifications-lite (in-app, no push yet since native isn't built).
+   - **✅ Reactions.** `apps/api/src/routes/selection.ts` gained
+     `POST/DELETE .../today/reactions`, and `GET .../today` now embeds the
+     current selection's reactions alongside views. Reactions are E2E
+     encrypted (ciphertext + nonce, same as comments) — see
+     [`DECISIONS.md`](DECISIONS.md#reactions-are-e2e-encrypted-so-they-need-an-id-not-a-composite-key)
+     for why that meant redesigning the table around a `uuid` id instead
+     of a composite key (migration `0004`). `apps/mobile`'s Today screen
+     shows a small fixed emoji palette (`REACTION_EMOJIS` in
+     `src/lib/today-pipeline.ts`) as tap-to-toggle chips with counts,
+     optimistically updated. Verified against the real API/R2/Neon with an
+     isolated test account: posted a reaction, confirmed it round-trips
+     through encrypt → store ciphertext → fetch → decrypt correctly,
+     deleted it, confirmed the list went back to empty, and confirmed
+     deleting an already-deleted reaction 404s (ownership/existence check
+     working).
+   - Member-removal key rotation and notifications-lite: not started.
 8. **Deploy** — staging + prod environments (Neon branch, Worker, R2
    bucket, secrets — one full set per environment, see
    [`ARCHITECTURE.md`](ARCHITECTURE.md#environments)), wired to CI: push to

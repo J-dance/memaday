@@ -289,19 +289,30 @@ export const views = pgTable(
   (t) => [primaryKey({ columns: [t.selectionId, t.userId] })],
 );
 
-export const reactions = pgTable(
-  "reactions",
-  {
-    selectionId: uuid("selection_id")
-      .notNull()
-      .references(() => dailySelections.id, { onDelete: "cascade" }),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    emoji: text("emoji").notNull(),
-  },
-  (t) => [primaryKey({ columns: [t.selectionId, t.userId, t.emoji] })],
-);
+// Shaped like `comments` (own uuid id, ciphertext + nonce), not a
+// composite key on (selectionId, userId, emoji) — see
+// docs/DECISIONS.md#reactions-are-e2e-encrypted-so-they-need-an-id-not-a-composite-key
+// for why: once the emoji itself is ciphertext, two encryptions of the
+// same emoji never produce the same bytes (fresh nonce every time), so
+// the server can't use emoji equality to dedupe or to know which row to
+// delete on "un-react." The client (which already decrypts every
+// reaction to render them) is what decides "do I already have a reaction
+// with this emoji" and either POSTs a new row or DELETEs the specific
+// row it already knows the id of.
+export const reactions = pgTable("reactions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  selectionId: uuid("selection_id")
+    .notNull()
+    .references(() => dailySelections.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  emoji: text("emoji").notNull(), // ciphertext
+  nonce: text("nonce").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 // --- Devices (added when native ships) ----------------------------------
 
