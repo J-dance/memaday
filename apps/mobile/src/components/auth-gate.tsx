@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { generateIdentityKeypair, unlockIdentityKeypair } from '@memaday/core';
 
 import { ThemedText } from './themed-text';
+import { ThemedTextInput } from './themed-text-input';
 import { ThemedView } from './themed-view';
 import { authClient } from '@/lib/auth-client';
 import { useIdentitySession } from '@/lib/identity-session';
@@ -98,7 +99,7 @@ function AuthForm({ onAuthenticated }: { onAuthenticated: (key: Uint8Array) => v
         </ThemedText>
 
         {mode === 'sign-up' && (
-          <TextInput
+          <ThemedTextInput
             placeholder="Display name"
             autoCapitalize="words"
             value={displayName}
@@ -106,7 +107,7 @@ function AuthForm({ onAuthenticated }: { onAuthenticated: (key: Uint8Array) => v
             style={styles.input}
           />
         )}
-        <TextInput
+        <ThemedTextInput
           placeholder="Email"
           autoCapitalize="none"
           keyboardType="email-address"
@@ -114,7 +115,7 @@ function AuthForm({ onAuthenticated }: { onAuthenticated: (key: Uint8Array) => v
           onChangeText={setEmail}
           style={styles.input}
         />
-        <TextInput
+        <ThemedTextInput
           placeholder="Password"
           secureTextEntry
           value={password}
@@ -171,7 +172,7 @@ function UnlockForm({ user, onUnlocked }: { user: UnlockableUser; onUnlocked: (k
         <ThemedText type="small" themeColor="textSecondary">
           {user.email}
         </ThemedText>
-        <TextInput
+        <ThemedTextInput
           placeholder="Password"
           secureTextEntry
           value={password}

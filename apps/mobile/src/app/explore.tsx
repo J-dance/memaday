@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
 import { generateGroupKey, unwrapGroupKey, wrapGroupKey } from '@memaday/core';
 
 import { ThemedText } from '@/components/themed-text';
+import { ThemedTextInput } from '@/components/themed-text-input';
 import { ThemedView } from '@/components/themed-view';
 import { authClient } from '@/lib/auth-client';
 import {
@@ -228,7 +229,7 @@ function CreateGroupForm({
   return (
     <ThemedView type="backgroundElement" style={styles.form}>
       <ThemedText type="smallBold">Create a group</ThemedText>
-      <TextInput placeholder="Group name" value={name} onChangeText={setName} style={styles.input} />
+      <ThemedTextInput placeholder="Group name" value={name} onChangeText={setName} style={styles.input} />
       {error && <ThemedText style={styles.error}>{error}</ThemedText>}
       <Pressable style={styles.button} onPress={handleCreate} disabled={submitting || !name}>
         {submitting ? (
@@ -265,7 +266,7 @@ function JoinGroupForm({ onJoined }: { onJoined: () => void }) {
   return (
     <ThemedView type="backgroundElement" style={styles.form}>
       <ThemedText type="smallBold">Join a group</ThemedText>
-      <TextInput
+      <ThemedTextInput
         placeholder="Invite code"
         autoCapitalize="characters"
         value={inviteCode}
