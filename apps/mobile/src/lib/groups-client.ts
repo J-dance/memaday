@@ -16,6 +16,9 @@ export interface GroupSummary {
   wrappedKey: string | null;
   /** The caller's own role in this group. */
   role: 'admin' | 'member';
+  /** Whether this group's current selection exists and the caller hasn't
+   * viewed it yet — drives the Today tab badge and per-group indicator. */
+  hasUnseenPhoto: boolean;
 }
 
 export interface PendingMember {

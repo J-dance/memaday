@@ -434,14 +434,18 @@ it, presigned uploads/downloads work from any non-browser client (curl, a
 backend) but are silently blocked from the one client that actually needs
 them.
 
-**Implication for later environments:** staging and prod will each need
-their own CORS policy on their own bucket, listing that environment's
-actual deployed web origin — the same "each environment configures its
-own thing" pattern already true of `WEB_ORIGIN` in `wrangler.jsonc` (see
-`docs/ARCHITECTURE.md#environments`). Easy to forget since it's set via a
-one-off `wrangler` command, not committed config — worth checking for
-explicitly when standing up staging/prod in
-[`ROADMAP.md`](ROADMAP.md) step 8.
+**Implication for later environments:** staging and prod each need their
+own CORS policy on their own bucket, listing that environment's actual
+deployed web origin — the same "each environment configures its own
+thing" pattern already true of `WEB_ORIGIN` in `wrangler.jsonc` (see
+`docs/ARCHITECTURE.md#environments`). Originally a one-off `wrangler`
+command with no committed config, which is exactly the kind of thing that
+gets forgotten when standing up a new environment — so when step 8 (deploy)
+was actually built, the policies moved into `apps/api/r2-cors/staging.json`
+/ `production.json`, applied with `wrangler r2 bucket cors set <bucket>
+--file apps/api/r2-cors/<env>.json`. The dev bucket's policy stays a local
+one-off (it's not deployed anywhere, and every command in this section
+already assumes running from `apps/api`).
 
 ---
 
@@ -480,6 +484,19 @@ practical way to poke at real request/response flows while building.
   unnecessary process for a project this size. Rejected for now in favor
   of `staging` acting as a real pre-prod gate, since the whole point is
   catching a bad migration or rotation-logic edge case before it's live.
+
+**Update — branch protection is convention, not enforced:** the `staging`
+branch now exists (pushed from `main` once cloud infra work started), but
+GitHub branch protection on `main` (blocking direct pushes, requiring a
+PR) turned out to need GitHub Pro or a public repo — confirmed by actually
+calling GitHub's protection API against this repo, not assumed. Neither is
+true here, and the trade-offs (a paid upgrade, or making the source
+public) weren't worth it just for this. So for now: `main` is protected by
+habit only — day-to-day work happens on `staging` (or branches off it),
+and merging into `main` is a manual, deliberate action the project owner
+does themselves via a PR, not something GitHub's server rejects if
+skipped. Revisit if the repo ever goes public or gets a Pro upgrade for
+other reasons — enabling real enforcement then is free.
 
 ---
 
@@ -644,3 +661,158 @@ Also: today every group has exactly one admin (its creator; no
 promote-to-admin flow exists), so the "can't remove the last admin" guard
 in the route can't actually be triggered through the UI yet — kept anyway
 so it's correct the moment admin promotion exists.
+
+---
+
+### Notifications-lite: "unseen photo" is derived state, not a stored notification
+
+**Decision:** There's no `notifications` table and no push infrastructure.
+"A new photo is up" is computed on the fly by `GET /v1/groups` as
+`hasUnseenPhoto` — a per-group boolean meaning "the current selection
+exists and the caller has no `views` row for it," using the same "most
+recent by `startsAt`" definition of *current* as `selection.ts`'s
+`getCurrentSelection` (so a not-yet-purged older selection during the
+post-rotation overlap window never counts). The client shows this two
+ways: a count badge on the Today tab, and a small dot next to each unseen
+group in the Today list (`apps/mobile/src/components/app-tabs.web.tsx`,
+`src/app/index.tsx`). It refreshes only when the groups list is already
+being fetched (tab mount) — no polling — since rotation is at most hourly,
+so mid-session staleness is a non-issue.
+
+**Why:** The `views` table already exists (step 6, view tracking) and
+already answers "has this user seen the current selection" exactly.
+Building a separate notifications/read-state system would duplicate that.
+Computing it server-side also means the check never needs to decrypt
+anything — selection/view existence is plaintext metadata, unlike the
+photo itself.
+
+**Alternatives rejected:** a dedicated `GET /v1/groups/unseen` endpoint
+(considered, but it's a second round trip the client has to keep in sync
+with the groups list it's already fetching, for no real benefit at this
+scale); polling while the app is open (adds complexity/battery cost for a
+value that changes at most once an hour per group).
+
+**Gotcha hit while building this:** `apps/mobile/src/components/app-tabs.tsx`
+(the `expo-router/unstable-native-tabs` version, for a future native build)
+and `app-tabs.web.tsx` (a hand-rolled tab bar using `expo-router/ui`) are
+*both* real, live files — Metro's platform-extension resolution picks
+`.web.tsx` for the current web-only build. Badge logic was added to both,
+but only the `.web.tsx` one is actually visible today; verify against that
+file specifically when testing tab-bar changes until native ships (see
+`docs/ROADMAP.md` step 9).
+
+**Scope note:** only "a new photo is up." Comment/reaction notifications
+are explicitly out of scope for now — deliberately deferred, not an
+oversight.
+
+---
+
+### Errors are logged via Cloudflare Workers Logs, not a third-party tracker (for now)
+
+**Decision:** Unhandled errors and the rotation/purge sweep's per-item
+failure logs (`apps/api/src/rotation.ts`) go through plain
+`console.error`, captured by Cloudflare's built-in Workers Logs
+(`"observability": { "enabled": true }` in `apps/api/wrangler.jsonc`) —
+queryable in the Cloudflare dashboard (e.g. filter `$metadata.error
+EXISTS`). No third-party error tracker (Sentry or similar) is wired up.
+
+**Why:** Zero new dependencies, no new account, no secret to manage — it's
+literally a config flag on infrastructure already in use, and it's exactly
+where the existing `console.error` calls already write to. Free plan gives
+~200k log events/day, comically more than a friend-group app's error
+volume will ever produce; the real constraint is 3-day retention on that
+plan, not volume.
+
+**Rejected (for now): Sentry or similar.** Would add proactive alerting
+(email/Slack the moment something breaks, not just "queryable if you go
+look") plus error grouping and stack traces — genuinely more capable. Not
+worth it yet because: (1) it's a new dependency and account, and (2) error
+payloads (stack traces, whatever context gets attached — e.g. a group id)
+would leave Cloudflare for a third party's servers, worth being deliberate
+about given this app's whole premise is minimizing what any party can see,
+even though it's metadata, not photo content. Revisit if/when actual
+alerting starts to matter — see `docs/SCALING.md`'s "Error visibility"
+section for when that's likely to be.
+
+---
+
+### Deploy CI: explicit `env.production`, and Worker secrets never touch GitHub
+
+**Decision:** Two corrections made while actually wiring up
+`docs/ROADMAP.md` step 8, both narrower/safer than the original sketch:
+
+1. `apps/api/wrangler.jsonc` has three configs, not two: the unnamed
+   top-level one (local `wrangler dev` only, pointed at a throwaway
+   `memaday-photos-dev` bucket), `env.staging`, and `env.production`. The
+   original plan implied prod was just "bare `wrangler deploy`," reusing
+   the top-level config — but that top-level config is also what local dev
+   already depends on, and giving it double duty as "also what prod
+   deploys with" means one accidental bare `wrangler deploy` ships the dev
+   bucket's name into production. `apps/api/package.json` has no bare
+   `deploy` script at all now, only `deploy:staging` / `deploy:production`.
+2. Only `DATABASE_URL` (needed to run migrations from the CI runner) and a
+   shared `CLOUDFLARE_API_TOKEN` (needed to authenticate `wrangler`) live
+   in GitHub — as GitHub Environment secrets scoped to `staging` /
+   `production` (Settings > Environments), selected per job by branch name.
+   `BETTER_AUTH_SECRET`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY` —
+   plus a *second*, separate copy of `DATABASE_URL` — are set directly on
+   each Worker via `wrangler secret put --env <name>`, once, the same way
+   `.dev.vars` supplies them locally. That Worker-side `DATABASE_URL` is
+   what every deployed request actually uses (`createDb(c.env.DATABASE_URL)`
+   in `apps/api/src/auth.ts` and friends); GitHub's copy never reaches the
+   Worker, it only ever touches the Actions runner for the migration step.
+   CI never reads or writes the other three secrets at all.
+
+**Why:** (1) is a straightforward "don't let two different intents share
+one config" fix — dev and prod having the same implicit config was a latent
+foot-gun, not a deliberate choice, caught while actually writing the
+deploy workflow rather than left for later. (2) follows from asking "what
+does this workflow actually need to touch": CI's job is running a
+migration command (needs `DATABASE_URL`) and invoking `wrangler
+deploy`/`wrangler pages deploy` (needs `CLOUDFLARE_API_TOKEN`) — it never
+constructs an auth header or a presigned URL itself, so it has no reason to
+hold the three credentials that do. `DATABASE_URL` living in both places
+isn't an inconsistency, just two different consumers (the CI runner vs.
+the deployed Worker) that each need their own copy of the same value —
+whereas the other three only ever have one real consumer (the Worker), so
+giving GitHub a copy would be pure unused surface area.
+
+**GitHub Environments over plain repo secrets:** repo-level secrets have
+one value shared by every workflow run regardless of branch, which would
+mean either prefixing every secret name (`STAGING_DATABASE_URL` /
+`PROD_DATABASE_URL`) or accepting that a bug in the branch-selection logic
+silently uses the wrong database. GitHub Environments let both branches
+use the identical secret *name* (`DATABASE_URL`) while a job's declared
+`environment:` (computed from the branch, see the two `deploy-*.yml`
+workflows) picks which value it actually resolves to — the mismatch case
+becomes structurally impossible instead of just unlikely.
+
+---
+
+### Local dev gets its own Neon branch too, not just its own R2 bucket
+
+**Decision:** `.dev.vars`' `DATABASE_URL` points at a `dev` Neon branch,
+separate from `staging` and from whatever branch is prod (`main`). This
+was a live question raised while standing up staging/prod (step 8): until
+now, local development and testing had been running directly against
+whatever Neon branch `.dev.vars` already pointed at — which, per
+`docs/ARCHITECTURE.md`, is the same branch about to become prod.
+
+**Why:** Confirmed explicitly — keep prod pristine. R2 already had this
+exact split (`memaday-photos-dev` vs. `memaday-photos`); Postgres hadn't,
+purely because there was no "staging or prod" to be pristine *for* until
+this step. The gap mattered more here than it might have for R2: an R2
+upload only counts once a separate `confirm` call says so, so stray local
+test uploads were always inert until confirmed. A Postgres write has no
+such gate — every query against `DATABASE_URL` lands immediately, for
+real, wherever that string points. Continuing to develop against the
+same branch that becomes prod would mean every local experiment (and every
+test user/group/photo created while verifying past `ROADMAP.md` steps)
+either already is, or silently becomes, real prod data.
+
+**Left for the project owner to do:** the accumulated test data already
+sitting on that branch (users, groups, photos, comments from verifying
+steps 2 through 7 end-to-end) — decide whether to reset/empty it before
+treating it as live prod, now that it's not also serving as the daily dev
+database. Not resolved here since it's a one-way door on real data;
+flagged for the project owner to act on deliberately.

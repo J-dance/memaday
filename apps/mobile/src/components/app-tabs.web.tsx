@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   Tabs,
   TabList,
@@ -12,17 +13,27 @@ import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
 import { ExternalLink } from './external-link';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
+import { listGroups } from '@/lib/groups-client';
 
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 
 export default function AppTabs() {
+  // Same "fetch once on mount" cadence as the Today/Groups tabs — rotation
+  // is at most hourly, so there's no need to poll while the app is open.
+  const [unseenCount, setUnseenCount] = useState(0);
+  useEffect(() => {
+    listGroups()
+      .then((groups) => setUnseenCount(groups.filter((g) => g.hasUnseenPhoto).length))
+      .catch(() => {});
+  }, []);
+
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
         <CustomTabList>
           <TabTrigger name="home" href="/" asChild>
-            <TabButton>Today</TabButton>
+            <TabButton badgeCount={unseenCount}>Today</TabButton>
           </TabTrigger>
           <TabTrigger name="explore" href="/explore" asChild>
             <TabButton>Groups</TabButton>
@@ -33,15 +44,27 @@ export default function AppTabs() {
   );
 }
 
-export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
+export function TabButton({
+  children,
+  isFocused,
+  badgeCount,
+  ...props
+}: TabTriggerSlotProps & { badgeCount?: number }) {
   return (
     <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
       <ThemedView
         type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
-        style={styles.tabButtonView}>
+        style={[styles.tabButtonView, styles.tabButtonRow]}>
         <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'}>
           {children}
         </ThemedText>
+        {!!badgeCount && (
+          <ThemedView style={styles.badge}>
+            <ThemedText type="small" style={styles.badgeText}>
+              {badgeCount}
+            </ThemedText>
+          </ThemedView>
+        )}
       </ThemedView>
     </Pressable>
   );
@@ -104,6 +127,25 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.three,
     borderRadius: Spacing.three,
+  },
+  tabButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  badge: {
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: '#3c87f7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    lineHeight: 12,
   },
   externalPressable: {
     flexDirection: 'row',

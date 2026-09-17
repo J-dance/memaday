@@ -1,0 +1,46 @@
+name: Deploy Web
+
+# staging and main are the only two branches that deploy anything — see
+# docs/ARCHITECTURE.md#deployment. One Cloudflare Pages project handles
+# both: pushing "main" is a production deploy, pushing "staging" is an
+# automatic preview alias (staging.<project>.pages.dev) — no second Pages
+# project needed.
+on:
+  push:
+    branches: [staging, main]
+    paths:
+      - "apps/mobile/**"
+      - "packages/core/**"
+      - ".github/workflows/deploy-web.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Selects the matching GitHub Environment (Settings > Environments),
+    # which is where API_BASE_URL is scoped per environment — see the
+    # deploy walkthrough for what to put there.
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build static web export
+        run: pnpm --filter @memaday/mobile run build:web
+        env:
+          # Expo inlines every EXPO_PUBLIC_* var into the client bundle at
+          # build time — not secret, just this environment's deployed API
+          # Worker URL. See docs/ARCHITECTURE.md#environments.
+          EXPO_PUBLIC_API_URL: ${{ vars.API_BASE_URL }}
+
+      - name: Deploy to Cloudflare Pages
+        run: pnpm --filter @memaday/mobile run deploy:${{ github.ref_name == 'main' && 'production' || 'staging' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -1,55 +1,140 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  // Worker name shows up in the Cloudflare dashboard and in the default
-  // *.workers.dev URL (memaday-api.<your-subdomain>.workers.dev).
-  "name": "memaday-api",
-  "main": "src/index.ts",
-  "compatibility_date": "2025-01-01",
-  // Lets Workers-bundled code use a subset of Node.js built-ins — some
-  // dependencies expect these even if we never call Node APIs directly.
-  "compatibility_flags": ["nodejs_compat"],
-  // Non-secret config, safe to commit. WEB_ORIGIN is the one browser
-  // origin allowed to make credentialed (cookie) requests to /v1/auth —
-  // see the CORS setup in src/index.ts. Expo's web dev server defaults to
-  // localhost:8081. Once staging/prod Workers exist (docs/ROADMAP.md step
-  // 8), each gets its own `env.<name>.vars.WEB_ORIGIN` pointing at that
-  // environment's deployed Pages URL instead of localhost.
-  "vars": {
-    "WEB_ORIGIN": "http://localhost:8081",
-    // Identify the R2 bucket for presigned photo uploads (see
-    // docs/DECISIONS.md's "Presigned R2 uploads via the S3 API" entry).
-    // Not secret — the account id and bucket name are just addressing
-    // info; the credentials that actually authorize signing live in
-    // .dev.vars / `wrangler secret put` (R2_ACCESS_KEY_ID,
-    // R2_SECRET_ACCESS_KEY).
-    "R2_ACCOUNT_ID": "ec9bc245b718baa485052b1ddfa05504",
-    "R2_BUCKET_NAME": "memaday-photos-dev",
-  },
-  // The native R2 binding, for anything that runs *inside* the Worker
-  // against this same bucket (confirming an upload landed, and later the
-  // purge job's delete) — as opposed to the S3-API credentials above, which
-  // exist only because presigning a URL for the *client* isn't something
-  // this binding can do. See docs/DECISIONS.md's "Presigned R2 uploads via
-  // the S3 API" entry.
-  //
-  // `remote: true` because `wrangler dev` otherwise simulates R2 bindings
-  // against a local-only bucket (miniflare, stored under .wrangler/state) —
-  // a photo actually PUT via a presigned URL lands in the *real* cloud
-  // bucket, so confirm's existence check has to look there too, or every
-  // confirm would 404 in local dev even for a real upload.
-  "r2_buckets": [
-    {
-      "binding": "PHOTOS_BUCKET",
-      "bucket_name": "memaday-photos-dev",
-      "remote": true,
-    },
-  ],
-  // Drives the rotation + purge sweep (src/rotation.ts's `scheduled`
-  // export) — see docs/DECISIONS.md's "Rotation and deletion are
-  // cron-driven" entry. `wrangler dev` doesn't fire this on its own; test
-  // it locally by hitting `/__scheduled` (wrangler's dev-only trigger
-  // endpoint) or by calling runScheduled directly.
-  "triggers": {
-    "crons": ["0 * * * *"],
-  },
+	"$schema": "node_modules/wrangler/config-schema.json",
+	// Worker name shows up in the Cloudflare dashboard and in the default
+	// *.workers.dev URL (memaday-api.<your-subdomain>.workers.dev).
+	"name": "memaday-api",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-01-01",
+	// Lets Workers-bundled code use a subset of Node.js built-ins — some
+	// dependencies expect these even if we never call Node APIs directly.
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	// Explicit, not Wrangler's silent default — this is what gives every
+	// environment its public *.workers.dev route (no custom domain set up
+	// yet for any environment, see docs/ARCHITECTURE.md#environments).
+	"workers_dev": true,
+	// Not secret — lets `wrangler deploy`/`wrangler secret put` run
+	// non-interactively in CI (an API-token login has no single implicit
+	// account the way an OAuth browser login does) without a separate
+	// CLOUDFLARE_ACCOUNT_ID secret, since this value already had to be
+	// committed anyway (see R2_ACCOUNT_ID below).
+	"account_id": "ec9bc245b718baa485052b1ddfa05504",
+	// Default (no --env): local development only, via `wrangler dev`. Points
+	// at throwaway dev-only cloud resources (a real R2 bucket, not simulated
+	// — see the r2_buckets comment below) that are separate from both
+	// `env.staging` and `env.production`. Deploying anything real always
+	// passes --env explicitly (`pnpm deploy:staging` / `pnpm
+	// deploy:production`) — there's no bare `wrangler deploy` script,
+	// specifically so a slip can't accidentally deploy a real environment
+	// using this dev-shaped config (e.g. pointing prod at the dev bucket).
+	"vars": {
+		"WEB_ORIGIN": "http://localhost:8081",
+		// Identify the R2 bucket for presigned photo uploads (see
+		// docs/DECISIONS.md's "Presigned R2 uploads via the S3 API" entry).
+		// Not secret — the account id and bucket name are just addressing
+		// info; the credentials that actually authorize signing live in
+		// .dev.vars / `wrangler secret put` (R2_ACCESS_KEY_ID,
+		// R2_SECRET_ACCESS_KEY).
+		"R2_ACCOUNT_ID": "ec9bc245b718baa485052b1ddfa05504",
+		"R2_BUCKET_NAME": "memaday-photos-dev",
+	},
+	// The native R2 binding, for anything that runs *inside* the Worker
+	// against this same bucket (confirming an upload landed, and later the
+	// purge job's delete) — as opposed to the S3-API credentials above, which
+	// exist only because presigning a URL for the *client* isn't something
+	// this binding can do. See docs/DECISIONS.md's "Presigned R2 uploads via
+	// the S3 API" entry.
+	//
+	// `remote: true` because `wrangler dev` otherwise simulates R2 bindings
+	// against a local-only bucket (miniflare, stored under .wrangler/state) —
+	// a photo actually PUT via a presigned URL lands in the *real* cloud
+	// bucket, so confirm's existence check has to look there too, or every
+	// confirm would 404 in local dev even for a real upload.
+	"r2_buckets": [
+		{
+			"binding": "PHOTOS_BUCKET",
+			"bucket_name": "memaday-photos-dev",
+			"remote": true,
+		},
+	],
+	// Drives the rotation + purge sweep (src/rotation.ts's `scheduled`
+	// export) — see docs/DECISIONS.md's "Rotation and deletion are
+	// cron-driven" entry. `wrangler dev` doesn't fire this on its own; test
+	// it locally by hitting `/__scheduled` (wrangler's dev-only trigger
+	// endpoint) or by calling runScheduled directly.
+	"triggers": {
+		"crons": [
+			"0 * * * *"
+		],
+	},
+	// Captures every console.log/warn/error and uncaught exception (e.g. the
+	// rotation/purge sweep's per-item failure logs) into Cloudflare's own
+	// dashboard, queryable with e.g. `$metadata.error EXISTS` — see
+	// docs/DECISIONS.md's "Errors are logged via Cloudflare Workers Logs"
+	// entry for why this over a third-party error tracker, for now.
+	"observability": {
+		"enabled": true,
+	},
+	// Named environments don't inherit `vars`/`r2_buckets`/`triggers`/
+	// `observability` from the top level — each block below repeats
+	// everything it needs, deliberately, so nothing here is a silent
+	// fallback to dev-shaped config. See docs/ARCHITECTURE.md#environments.
+	"env": {
+		"staging": {
+			"name": "memaday-api-staging",
+			"workers_dev": true,
+			"vars": {
+				// Cloudflare Pages aliases every branch deploy as
+				// <branch>.<project>.pages.dev — this is correct as soon as the
+				// Pages project is created with the name "memaday-web" (see the
+				// deploy walkthrough). Update if a different project name is used.
+				"WEB_ORIGIN": "https://staging.memaday-web.pages.dev",
+				"R2_ACCOUNT_ID": "ec9bc245b718baa485052b1ddfa05504",
+				"R2_BUCKET_NAME": "memaday-photos-staging",
+			},
+			"r2_buckets": [
+				{
+					"binding": "PHOTOS_BUCKET",
+					"bucket_name": "memaday-photos-staging",
+					"remote": true,
+				},
+			],
+			"triggers": {
+				"crons": [
+					"0 * * * *"
+				],
+			},
+			"observability": {
+				"enabled": true,
+			},
+		},
+		"production": {
+			// Explicit, not the implicit top-level name — see the "default
+			// config" comment above for why bare `wrangler deploy` isn't a
+			// thing here at all, staging included.
+			"name": "memaday-api",
+			"workers_dev": true,
+			"vars": {
+				"WEB_ORIGIN": "https://memaday-web.pages.dev",
+				"R2_ACCOUNT_ID": "ec9bc245b718baa485052b1ddfa05504",
+				"R2_BUCKET_NAME": "memaday-photos",
+			},
+			"r2_buckets": [
+				{
+					"binding": "PHOTOS_BUCKET",
+					"bucket_name": "memaday-photos",
+					"remote": true,
+				},
+			],
+			"triggers": {
+				"crons": [
+					"0 * * * *"
+				],
+			},
+			"observability": {
+				"enabled": true,
+			},
+		},
+	},
 }

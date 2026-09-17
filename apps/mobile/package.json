@@ -33,7 +33,8 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "wrangler": "^4.0.0"
   },
   "scripts": {
     "start": "expo start",
@@ -43,7 +44,10 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:web": "expo export -p web",
+    "deploy:staging": "wrangler pages deploy dist --project-name=memaday-web --branch=staging",
+    "deploy:production": "wrangler pages deploy dist --project-name=memaday-web --branch=main"
   },
   "private": true
 }

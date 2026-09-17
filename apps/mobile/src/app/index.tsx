@@ -183,7 +183,10 @@ function TodaySection({
 
   return (
     <ThemedView type="backgroundElement" style={styles.section}>
-      <ThemedText type="smallBold">{group.name}</ThemedText>
+      <ThemedView style={styles.groupHeader}>
+        <ThemedText type="smallBold">{group.name}</ThemedText>
+        {group.hasUnseenPhoto && <ThemedView style={styles.unseenDot} />}
+      </ThemedView>
 
       {error && <ThemedText style={styles.error}>{error}</ThemedText>}
 
@@ -297,6 +300,17 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.two,
     padding: Spacing.three,
     gap: Spacing.two,
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  unseenDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#3c87f7',
   },
   photo: {
     alignSelf: 'stretch',
