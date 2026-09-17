@@ -1,0 +1,50 @@
+name: Deploy API
+
+# staging and main are the only two branches that deploy anything — see
+# docs/ARCHITECTURE.md#deployment. Path filters mean a docs-only or
+# mobile-only push doesn't burn a deploy.
+on:
+  push:
+    branches: [staging, main]
+    paths:
+      - "apps/api/**"
+      - "packages/core/**"
+      - "packages/db/**"
+      - ".github/workflows/deploy-api.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Selects the matching GitHub Environment (Settings > Environments),
+    # which is where DATABASE_URL is scoped per environment — see the
+    # deploy walkthrough for what to put there.
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Same command whether this touches staging's throwaway data or
+      # prod's real data — which one is entirely a function of DATABASE_URL,
+      # scoped per GitHub Environment. No separate "staging migration"
+      # tooling; see docs/ARCHITECTURE.md#environments.
+      - name: Run database migrations
+        run: pnpm --filter @memaday/db db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # BETTER_AUTH_SECRET / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY are
+      # Worker secrets, set once directly via `wrangler secret put --env
+      # <name>` (see the walkthrough) — not GitHub secrets, since this
+      # workflow never needs to read or rotate them, only deploy code.
+      - name: Deploy Worker
+        run: pnpm --filter @memaday/api run deploy:${{ github.ref_name == 'main' && 'production' || 'staging' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -131,10 +131,41 @@ every stateful piece — nothing is shared between them:
 | Service | Prod | Staging |
 |---|---|---|
 | Postgres | Neon **`main`** branch | Neon **`staging`** branch (same project) |
-| API | Worker `memaday-api` | Worker `memaday-api-staging` — a `wrangler.jsonc` `env.staging` block, same code, separate name/secrets/bindings |
+| API | Worker `memaday-api` — `wrangler.jsonc`'s `env.production` block | Worker `memaday-api-staging` — `env.staging` block, same code, separate name/secrets/bindings |
 | Photo blobs | R2 bucket `memaday-photos` | R2 bucket `memaday-photos-staging` |
-| Web | Cloudflare Pages prod | Pages preview deploy (automatic per-branch, no separate project needed) |
+| Web | Cloudflare Pages project `memaday-web`, `main` branch deploy (`memaday-web.pages.dev`) | Same Pages project, `staging` branch deploy — Cloudflare's automatic branch alias (`staging.memaday-web.pages.dev`), no second project needed |
 | `BETTER_AUTH_SECRET` | prod value | distinct value — session tokens must not verify across environments |
+
+There's also a third, unnamed config in `wrangler.jsonc` (no `env.` block)
+used only by local `wrangler dev` — its own throwaway R2 bucket
+(`memaday-photos-dev`) *and* its own throwaway Neon branch (`dev`,
+`.dev.vars`' `DATABASE_URL`), never deployed anywhere. Keeping prod's Neon
+branch untouched by local experimentation matters more than it might for
+R2: unlike a photo blob, there's no "confirm" step that only counts an
+upload once it's landed in the real target — every query against
+`DATABASE_URL` lands wherever that string points, immediately, so a local
+dev session and prod need to be different databases from day one, not just
+in theory. `apps/api/package.json` has no bare `deploy` script, only
+`deploy:staging` / `deploy:production` — deliberately, so a slip can't
+deploy using this dev-shaped config against a real environment.
+
+**Secrets split in two, by who needs to read them — `DATABASE_URL` is the
+one value both sides need, for different reasons:**
+- **GitHub Environment secrets** (`DATABASE_URL` per environment, plus a
+  shared repo-level `CLOUDFLARE_API_TOKEN`) — the only things CI itself
+  needs: running migrations from the Actions runner (`DATABASE_URL`), and
+  authenticating `wrangler deploy`/`wrangler pages deploy`
+  (`CLOUDFLARE_API_TOKEN`).
+- **Worker secrets** (`DATABASE_URL`, `BETTER_AUTH_SECRET`,
+  `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` — everything in
+  `apps/api/src/bindings.ts` that isn't a plain `vars` value) — set once
+  per environment directly via `wrangler secret put --env <name>`, the
+  same way `.dev.vars` supplies them locally. This is what the *deployed
+  Worker* reads on every request; CI's copy of `DATABASE_URL` above is
+  separate and only ever touches the Actions runner, for the migration
+  step. CI never reads or writes the other three, since it only deploys
+  code, so
+  there's no reason for them to live in GitHub at all.
 
 **Why a Neon branch, not a second project:** Neon branches are
 copy-on-write off the parent — a `staging` branch can be reset back to
@@ -161,19 +192,26 @@ environment split rather than deploying straight from every push to
   new rotation-cron edge case gets exercised against real (throwaway) data
   before it's anywhere near prod.
 - **`main`** — only updated by merging `staging` in once it's been
-  poked at. Every push here deploys to prod. `main` is otherwise
-  protected — no direct pushes.
+  poked at. Every push here deploys to prod. `main` is protected by
+  convention, not GitHub's enforced branch protection — see
+  [`DECISIONS.md`](DECISIONS.md#staging-environment-set-up-now-on-a-staging-branch-before-deploy-ci-exists)'s
+  "branch protection is convention, not enforced" update for why.
 
 API and web app deploy **independently** within each environment, even
-though they share a repo:
+though they share a repo, via two GitHub Actions workflows
+(`.github/workflows/deploy-api.yml`, `deploy-web.yml`) that both pick a
+GitHub Environment (`staging` or `production`) from the branch name:
 
-- **API**: push to `staging`/`main` → GitHub Actions runs `wrangler deploy
-  --env staging` or `wrangler deploy` (path-filtered to `apps/api/**`,
-  `packages/core/**`, `packages/db/**`) → live on the corresponding Worker
-  in ~seconds. Rollback is redeploying the previous Worker version.
-- **Web**: push to `staging`/`main` → GitHub Actions runs `expo export -p
-  web` (path-filtered to `apps/mobile/**`, `packages/core/**`) → static
-  output deployed to the corresponding Cloudflare Pages target.
+- **API**: push to `staging`/`main` → run `packages/db`'s migrations
+  against that environment's `DATABASE_URL`, then `pnpm --filter
+  @memaday/api run deploy:staging` / `deploy:production` (path-filtered to
+  `apps/api/**`, `packages/core/**`, `packages/db/**`) → live on the
+  corresponding Worker in ~seconds. Rollback is redeploying the previous
+  Worker version.
+- **Web**: push to `staging`/`main` → `expo export -p web` (path-filtered
+  to `apps/mobile/**`, `packages/core/**`) with that environment's
+  `EXPO_PUBLIC_API_URL` baked in → `wrangler pages deploy` to the
+  corresponding Cloudflare Pages target.
 - **Native** (later): manual `eas build` + store submission, pointed at
   whichever environment's API is being tested (TestFlight builds against
   staging, release builds against prod). Not tied to every commit — App
