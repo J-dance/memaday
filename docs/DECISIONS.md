@@ -816,3 +816,31 @@ steps 2 through 7 end-to-end) — decide whether to reset/empty it before
 treating it as live prod, now that it's not also serving as the daily dev
 database. Not resolved here since it's a one-way door on real data;
 flagged for the project owner to act on deliberately.
+
+---
+
+### R2 API tokens need per-bucket scope, not reused across environments
+
+**Decision:** Staging and production each get their own R2 API token
+(Access Key ID + Secret), scoped in the Cloudflare dashboard to only their
+own bucket — not the same access key/secret already used for the local
+`memaday-photos-dev` bucket.
+
+**Why:** Caught by the first real smoke test against deployed staging
+(`docs/ROADMAP.md` step 8) — reusing the existing dev R2 credentials for
+`env.staging`/`env.production` seemed harmless at the time (presigning is
+just local SigV4 math over whatever `R2_ACCOUNT_ID`/`R2_BUCKET_NAME` the
+environment supplies, so the presign *endpoint itself* returned a
+perfectly well-formed URL). The failure only showed up one step later: the
+actual `PUT` to that presigned URL got `403 AccessDenied` from R2, because
+the underlying access key was scoped to `memaday-photos-dev` only, and R2
+checks the token's real bucket scope at request time regardless of what
+the signed URL claims. A test that stopped at "did presign return 200"
+(easy to do, since that's the first and most obviously-testable step)
+would have shipped this broken — uploads would have failed for a real user
+the first time they tried, with no earlier signal.
+
+**Implication:** any time a new bucket is added, it needs its own R2 API
+token (or an existing token's scope explicitly extended to include it,
+where Cloudflare's dashboard allows that) — never assume an existing token
+already covers a new bucket just because the code path is identical.

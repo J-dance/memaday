@@ -163,10 +163,34 @@ repo state before assuming a step is fully done, this list can drift.
      `true` and both UI indicators appeared, inserted a `views` row to
      simulate the photo being seen, and confirmed both indicators
      disappeared on reload.
-8. **Deploy** — staging + prod environments (Neon branch, Worker, R2
-   bucket, secrets — one full set per environment, see
-   [`ARCHITECTURE.md`](ARCHITECTURE.md#environments)), wired to CI: push to
-   `staging` deploys staging, merging `staging` into `main` deploys prod.
+8. **✅ Deploy.** Three Neon branches now (`dev`,
+   `staging`, and the original branch reset clean as prod — see
+   [`DECISIONS.md`](DECISIONS.md#local-dev-gets-its-own-neon-branch-too-not-just-its-own-r2-bucket)),
+   two Cloudflare Workers (`memaday-api-staging` / `memaday-api`, explicit
+   `env.staging` / `env.production` blocks in `wrangler.jsonc`, no bare
+   `wrangler deploy`), two R2 buckets each with their own CORS policy
+   (`apps/api/r2-cors/`) and their own scoped R2 API token (see
+   [`DECISIONS.md`](DECISIONS.md#r2-api-tokens-need-per-bucket-scope-not-reused-across-environments)),
+   one Cloudflare Pages project (`memaday-web`) serving both via branch
+   aliasing, wired to two GitHub Actions workflows
+   (`.github/workflows/deploy-api.yml`, `deploy-web.yml`) gated by GitHub
+   Environment (`staging`/`production`, selected by branch) — full layout
+   in [`ARCHITECTURE.md`](ARCHITECTURE.md#environments). `main` is
+   protected by convention only, not GitHub's enforced branch protection
+   (needs GitHub Pro or a public repo — neither true here); the project
+   owner merges `staging` into `main` manually. Verified staging
+   end-to-end against the real deployed Worker, not just a health check:
+   sign up → create group → presign → encrypt → PUT to the real staging R2
+   bucket → confirm → list → download → decrypt, bytes matching exactly.
+   That run first caught the R2 token scoping gap below before it could
+   have affected a real upload. `staging` was merged into `main` via a
+   real PR, and both the API and web deploys fired via CI and went live:
+   `memaday-api.<subdomain>.workers.dev` and `memaday-web.pages.dev` both
+   respond correctly. Prod wasn't put through the same full upload/decrypt
+   smoke test as staging — deliberately, since that would mean writing
+   test data onto the branch that was just reset specifically to stay
+   pristine; a health check plus staging already having proven the
+   identical code/config was judged sufficient here.
 9. **(Later, once web is validated) Native** — swap `libsodium-wrappers`
    (WASM, doesn't run under Hermes) for a native-bindings crypto library,
    `eas build`, TestFlight, push notifications via Expo Push, App Store /

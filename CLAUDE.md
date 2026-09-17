@@ -11,9 +11,12 @@ on; when the next one is selected, the previous photo and its comments are
 hard-deleted everywhere.
 
 **Current status: auth, groups/key-exchange, photo upload, rotation/purge,
-and the today's-photo screen (with comments + view tracking) all work
-end-to-end. Not built yet: reactions, member-removal key rotation,
-notifications, and deploy (staging/prod).** `apps/api` is a Hono app with
+the today's-photo screen (comments + view tracking + reactions), member
+removal, notifications-lite (unseen-photo badge), and deploy (staging +
+prod, wired to CI) all work end-to-end — see
+[`docs/ROADMAP.md`](docs/ROADMAP.md) for what each step actually covers.
+Not built yet: native (deferred until web is validated, per the
+roadmap).** `apps/api` is a Hono app with
 `/v1/health`, Better Auth at `/v1/auth` (CORS + `trustedOrigins` scoped to
 `WEB_ORIGIN`), `/v1/groups` routes (`apps/api/src/routes/groups.ts`) for
 create/join/pending-members/admit, `/v1/groups/:id/photos` routes
@@ -105,3 +108,13 @@ get a working app shipped. This changes how to work here, beyond the usual
 - When a new architectural or product decision gets made in conversation,
   add it to `docs/DECISIONS.md` (or `docs/OPEN_QUESTIONS.md` if it's
   raised but not yet resolved) rather than only acting on it silently.
+- **Three environments now exist (`docs/ARCHITECTURE.md#environments`) —
+  keep work in the right one.** Day-to-day development and manual testing
+  runs against the `dev` Neon branch (`.dev.vars`'s `DATABASE_URL`) and
+  local `wrangler dev`/`expo start --web`, never against staging or prod
+  directly. Real end-to-end verification of a change (the kind every
+  roadmap step gets) belongs on the `staging` branch, which CI deploys to
+  the real staging Worker/Postgres/R2/Pages automatically — that's what
+  actually exercises the deployed config, not just the code. `main` only
+  ever gets `staging`'s already-verified state, merged in by the project
+  owner; nothing should be developed or tested directly against prod.
