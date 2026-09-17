@@ -10,6 +10,10 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+	// Explicit, not Wrangler's silent default — this is what gives every
+	// environment its public *.workers.dev route (no custom domain set up
+	// yet for any environment, see docs/ARCHITECTURE.md#environments).
+	"workers_dev": true,
 	// Not secret — lets `wrangler deploy`/`wrangler secret put` run
 	// non-interactively in CI (an API-token login has no single implicit
 	// account the way an OAuth browser login does) without a separate
@@ -79,6 +83,7 @@
 	"env": {
 		"staging": {
 			"name": "memaday-api-staging",
+			"workers_dev": true,
 			"vars": {
 				// Cloudflare Pages aliases every branch deploy as
 				// <branch>.<project>.pages.dev — this is correct as soon as the
@@ -109,6 +114,7 @@
 			// config" comment above for why bare `wrangler deploy` isn't a
 			// thing here at all, staging included.
 			"name": "memaday-api",
+			"workers_dev": true,
 			"vars": {
 				"WEB_ORIGIN": "https://memaday-web.pages.dev",
 				"R2_ACCOUNT_ID": "ec9bc245b718baa485052b1ddfa05504",
