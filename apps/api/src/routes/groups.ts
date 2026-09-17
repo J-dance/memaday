@@ -125,6 +125,24 @@ groupsRoute.get("/", async (c) => {
       // admin-only controls (currently just member removal) without a
       // separate request.
       role: groupMembers.role,
+      // "Unseen" mirrors selection.ts's getCurrentSelection: the group's
+      // most recent selection by startsAt (not just any without a view —
+      // during the post-rotation overlap window an older, about-to-purge
+      // row can still exist alongside it, and that one shouldn't count).
+      // Plaintext metadata only (selection/view existence, not the photo
+      // itself), so this needs no decryption to compute server-side.
+      hasUnseenPhoto: sql<boolean>`COALESCE((
+        SELECT NOT EXISTS (
+          SELECT 1 FROM views v
+          WHERE v.selection_id = latest.id AND v.user_id = ${user.id}
+        )
+        FROM (
+          SELECT ds.id FROM daily_selections ds
+          WHERE ds.group_id = ${groups.id}
+          ORDER BY ds.starts_at DESC
+          LIMIT 1
+        ) latest
+      ), false)`,
     })
     .from(groupMembers)
     .innerJoin(groups, eq(groups.id, groupMembers.groupId))

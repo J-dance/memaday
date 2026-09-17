@@ -116,8 +116,8 @@ repo state before assuming a step is fully done, this list can drift.
    rotation as documented — see
    [`DECISIONS.md`](DECISIONS.md#purge-deletes-the-photos-row-entirely)'s
    neighboring entries and `apps/api/src/rotation.ts` for the fix.
-7. **Polish pass (in progress)** — reactions, member removal,
-   notifications-lite (in-app, no push yet since native isn't built).
+7. **✅ Polish pass** — reactions, member removal, notifications-lite
+   (in-app, no push yet since native isn't built).
    - **✅ Reactions.** `apps/api/src/routes/selection.ts` gained
      `POST/DELETE .../today/reactions`, and `GET .../today` now embeds the
      current selection's reactions alongside views. Reactions are E2E
@@ -150,7 +150,19 @@ repo state before assuming a step is fully done, this list can drift.
      succeeds and the target's own group list and every group route
      correctly excludes/403s them afterward, and the admin's own key is
      confirmed untouched.
-   - Notifications-lite: not started.
+   - **✅ Notifications-lite** ("a new photo is up" only — comments/reactions
+     deferred). No new table or push infra: `hasUnseenPhoto` is computed by
+     `GET /v1/groups` from data that already existed (a current selection
+     with no matching `views` row for the caller) — see
+     [`DECISIONS.md`](DECISIONS.md#notifications-lite-unseen-photo-is-derived-state-not-a-stored-notification).
+     `apps/mobile`'s Today tab shows a count badge
+     (`app-tabs.web.tsx`) and each unseen group gets a small dot in the
+     Today list (`src/app/index.tsx`); both recompute on tab mount only, no
+     polling. Verified against the real API/Neon: seeded a `ready` photo,
+     ran a real rotation sweep, confirmed `hasUnseenPhoto` flipped to
+     `true` and both UI indicators appeared, inserted a `views` row to
+     simulate the photo being seen, and confirmed both indicators
+     disappeared on reload.
 8. **Deploy** — staging + prod environments (Neon branch, Worker, R2
    bucket, secrets — one full set per environment, see
    [`ARCHITECTURE.md`](ARCHITECTURE.md#environments)), wired to CI: push to

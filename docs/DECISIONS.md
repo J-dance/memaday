@@ -644,3 +644,46 @@ Also: today every group has exactly one admin (its creator; no
 promote-to-admin flow exists), so the "can't remove the last admin" guard
 in the route can't actually be triggered through the UI yet — kept anyway
 so it's correct the moment admin promotion exists.
+
+---
+
+### Notifications-lite: "unseen photo" is derived state, not a stored notification
+
+**Decision:** There's no `notifications` table and no push infrastructure.
+"A new photo is up" is computed on the fly by `GET /v1/groups` as
+`hasUnseenPhoto` — a per-group boolean meaning "the current selection
+exists and the caller has no `views` row for it," using the same "most
+recent by `startsAt`" definition of *current* as `selection.ts`'s
+`getCurrentSelection` (so a not-yet-purged older selection during the
+post-rotation overlap window never counts). The client shows this two
+ways: a count badge on the Today tab, and a small dot next to each unseen
+group in the Today list (`apps/mobile/src/components/app-tabs.web.tsx`,
+`src/app/index.tsx`). It refreshes only when the groups list is already
+being fetched (tab mount) — no polling — since rotation is at most hourly,
+so mid-session staleness is a non-issue.
+
+**Why:** The `views` table already exists (step 6, view tracking) and
+already answers "has this user seen the current selection" exactly.
+Building a separate notifications/read-state system would duplicate that.
+Computing it server-side also means the check never needs to decrypt
+anything — selection/view existence is plaintext metadata, unlike the
+photo itself.
+
+**Alternatives rejected:** a dedicated `GET /v1/groups/unseen` endpoint
+(considered, but it's a second round trip the client has to keep in sync
+with the groups list it's already fetching, for no real benefit at this
+scale); polling while the app is open (adds complexity/battery cost for a
+value that changes at most once an hour per group).
+
+**Gotcha hit while building this:** `apps/mobile/src/components/app-tabs.tsx`
+(the `expo-router/unstable-native-tabs` version, for a future native build)
+and `app-tabs.web.tsx` (a hand-rolled tab bar using `expo-router/ui`) are
+*both* real, live files — Metro's platform-extension resolution picks
+`.web.tsx` for the current web-only build. Badge logic was added to both,
+but only the `.web.tsx` one is actually visible today; verify against that
+file specifically when testing tab-bar changes until native ships (see
+`docs/ROADMAP.md` step 9).
+
+**Scope note:** only "a new photo is up." Comment/reaction notifications
+are explicitly out of scope for now — deliberately deferred, not an
+oversight.
