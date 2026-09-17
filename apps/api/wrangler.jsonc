@@ -52,4 +52,12 @@
   "triggers": {
     "crons": ["0 * * * *"],
   },
+  // Captures every console.log/warn/error and uncaught exception (e.g. the
+  // rotation/purge sweep's per-item failure logs) into Cloudflare's own
+  // dashboard, queryable with e.g. `$metadata.error EXISTS` — see
+  // docs/DECISIONS.md's "Errors are logged via Cloudflare Workers Logs"
+  // entry for why this over a third-party error tracker, for now.
+  "observability": {
+    "enabled": true,
+  },
 }

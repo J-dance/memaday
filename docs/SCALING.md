@@ -66,6 +66,31 @@ the app ever opens to less-trusted or public groups:
   who share it deliberately, not fine if codes need to resist guessing at
   scale.
 
+## 6. Error visibility: Workers Logs stops being enough
+
+Errors currently go to Cloudflare's built-in Workers Logs (see
+`DECISIONS.md`'s "Errors are logged via Cloudflare Workers Logs" entry) —
+queryable in the dashboard, but nothing pages or emails anyone when
+something breaks, and the free plan only retains 3 days of logs. Fine
+while checking in occasionally is good enough. Worth revisiting once
+either stops being true — e.g. once people other than the person building
+this actually depend on it daily, so a missed rotation nobody notices for
+a few days is a real complaint instead of a shrug, or once there's a
+staging/prod split (`docs/ROADMAP.md` step 8) and "did last night's deploy
+break something" needs an answer faster than "go look."
+
+- Add a **third-party error tracker** (Sentry or similar) alongside
+  Workers Logs, not instead of it — for proactive alerting (email/Slack
+  the moment something breaks) and error grouping/stack traces that
+  Workers Logs doesn't do.
+- This is additive, not a migration: the `console.error` calls already in
+  place keep working either way: most Sentry-style SDKs wrap them, or a
+  Tail Worker can forward Workers Logs output to a third party without
+  touching call sites at all.
+- Worth a deliberate look at what context gets attached to reported errors
+  before wiring this up — see `ENCRYPTION.md` for what this app is
+  otherwise careful not to expose to any third party.
+
 ## What doesn't need to change
 
 The core design choices — R2 for blobs, Postgres for metadata, ports &

@@ -687,3 +687,32 @@ file specifically when testing tab-bar changes until native ships (see
 **Scope note:** only "a new photo is up." Comment/reaction notifications
 are explicitly out of scope for now — deliberately deferred, not an
 oversight.
+
+---
+
+### Errors are logged via Cloudflare Workers Logs, not a third-party tracker (for now)
+
+**Decision:** Unhandled errors and the rotation/purge sweep's per-item
+failure logs (`apps/api/src/rotation.ts`) go through plain
+`console.error`, captured by Cloudflare's built-in Workers Logs
+(`"observability": { "enabled": true }` in `apps/api/wrangler.jsonc`) —
+queryable in the Cloudflare dashboard (e.g. filter `$metadata.error
+EXISTS`). No third-party error tracker (Sentry or similar) is wired up.
+
+**Why:** Zero new dependencies, no new account, no secret to manage — it's
+literally a config flag on infrastructure already in use, and it's exactly
+where the existing `console.error` calls already write to. Free plan gives
+~200k log events/day, comically more than a friend-group app's error
+volume will ever produce; the real constraint is 3-day retention on that
+plan, not volume.
+
+**Rejected (for now): Sentry or similar.** Would add proactive alerting
+(email/Slack the moment something breaks, not just "queryable if you go
+look") plus error grouping and stack traces — genuinely more capable. Not
+worth it yet because: (1) it's a new dependency and account, and (2) error
+payloads (stack traces, whatever context gets attached — e.g. a group id)
+would leave Cloudflare for a third party's servers, worth being deliberate
+about given this app's whole premise is minimizing what any party can see,
+even though it's metadata, not photo content. Revisit if/when actual
+alerting starts to matter — see `docs/SCALING.md`'s "Error visibility"
+section for when that's likely to be.
